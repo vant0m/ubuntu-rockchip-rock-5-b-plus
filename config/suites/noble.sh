@@ -11,4 +11,7 @@ export KERNEL_REPO="https://github.com/Joshua-Riek/linux-rockchip.git"
 export KERNEL_BRANCH="noble"
 export KERNEL_FLAVOR="rockchip"
 
+# dpkg hangs in a noble chroot under QEMU 8.2 from Ubuntu 24.04
+export QEMU_MIN_VERSION="9.1"
+
 export EXTRA_PPAS="jjriek/rockchip jjriek/rockchip-multimedia"
