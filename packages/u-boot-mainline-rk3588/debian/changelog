@@ -1,0 +1,6 @@
+u-boot-mainline-rk3588 (2026.10-1) resolute; urgency=medium
+
+  * Initial release based on mainline U-Boot v2026.10.
+  * Use the rkbin LPDDR4/LPDDR5 DDR blob v1.24 and BL31 v1.56.
+
+ -- vant0m <vant0m@users.noreply.github.com>  Sat, 10 Oct 2026 08:50:36 +0000
