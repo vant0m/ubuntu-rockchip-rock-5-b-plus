@@ -178,6 +178,11 @@ if [ "${KERNEL_ONLY}" == "Y" ]; then
     exit 0
 fi
 
+# Recent Ubuntu releases need a recent QEMU to run arm64 binaries in a chroot
+if [ "${UBOOT_ONLY}" != "Y" ]; then
+    ./scripts/setup-qemu.sh
+fi
+
 if [ "${ROOTFS_ONLY}" == "Y" ]; then
     if [ -z "${SUITE}" ] || [ -z "${FLAVOR}" ]; then
         usage
