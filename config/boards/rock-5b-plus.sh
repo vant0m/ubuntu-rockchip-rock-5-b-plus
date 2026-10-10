@@ -27,6 +27,10 @@ function config_image_hook__rock-5b-plus() {
         # Install the rockchip camera engine
         chroot "${rootfs}" apt-get -y install camera-engine-rkaiq-rk3588
 
+        # Fix Bluetooth not working with the onboard RTL8852BE WiFi + BT chip
+        cp "${overlay}/usr/lib/systemd/system/radxa-a8-bluetooth.service" "${rootfs}/usr/lib/systemd/system/radxa-a8-bluetooth.service"
+        chroot "${rootfs}" systemctl enable radxa-a8-bluetooth
+
         # Fix and configure audio device
         mkdir -p "${rootfs}/usr/lib/scripts"
         cp "${overlay}/usr/lib/scripts/alsa-audio-config" "${rootfs}/usr/lib/scripts/alsa-audio-config"
