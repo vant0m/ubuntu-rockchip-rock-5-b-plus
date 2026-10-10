@@ -33,25 +33,29 @@ kernels=""
 for suite in "${COMPATIBLE_SUITES[@]}"; do
     contains "${wanted_suites}" "${suite}" || continue
 
+    unset KERNEL_TYPE KERNEL_BUILD_HOST
     # shellcheck source=/dev/null
     source "config/suites/${suite}.sh"
 
+    # The kernel must be built on the same Ubuntu release as the suite. The
+    # 22.04 rootfs and images are built on 22.04 too: its apt randomly fails
+    # with ENOMEM when emulated on a 24.04 host.
+    case "${KERNEL_BUILD_HOST}" in
+        jammy) runner="ubuntu-22.04" ;;
+        noble|"") runner="ubuntu-24.04" ;;
+        *)
+            echo "Error: no GitHub runner for Ubuntu ${KERNEL_BUILD_HOST}" >&2
+            exit 1
+            ;;
+    esac
+
     if [[ ${KERNEL_TYPE} == "vendor" ]]; then
-        # The kernel must be built on the same Ubuntu release as the suite
-        case "${KERNEL_BUILD_HOST}" in
-            jammy) runner="ubuntu-22.04" ;;
-            noble) runner="ubuntu-24.04" ;;
-            *)
-                echo "Error: no GitHub runner for Ubuntu ${KERNEL_BUILD_HOST}" >&2
-                exit 1
-                ;;
-        esac
         kernels+="{\"suite\":\"${suite}\",\"runner\":\"${runner}\"},"
     fi
 
     for flavor in "${COMPATIBLE_FLAVORS[@]}"; do
         contains "${wanted_flavors}" "${flavor}" || continue
-        images+="{\"board\":\"${board}\",\"suite\":\"${suite}\",\"flavor\":\"${flavor}\",\"version\":\"${RELASE_VERSION}\",\"kernel_type\":\"${KERNEL_TYPE}\"},"
+        images+="{\"board\":\"${board}\",\"suite\":\"${suite}\",\"flavor\":\"${flavor}\",\"version\":\"${RELASE_VERSION}\",\"kernel_type\":\"${KERNEL_TYPE}\",\"runner\":\"${runner}\"},"
     done
 done
 

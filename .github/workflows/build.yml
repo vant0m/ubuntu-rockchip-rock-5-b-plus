@@ -41,7 +41,7 @@ jobs:
         run: .github/scripts/matrix.sh "${SUITES}" "${FLAVORS}" | tee -a "$GITHUB_OUTPUT"
 
   rootfs:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     name: Build rootfs ${{ matrix.suite }} ${{ matrix.flavor }}
     timeout-minutes: 180
     needs: [config]
@@ -95,7 +95,7 @@ jobs:
           retention-days: 3
 
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     name: Build image ${{ matrix.suite }} ${{ matrix.flavor }}
     timeout-minutes: 120
     needs: [config, rootfs, kernel]
