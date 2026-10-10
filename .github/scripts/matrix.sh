@@ -42,7 +42,16 @@ for suite in "${COMPATIBLE_SUITES[@]}"; do
     source "config/suites/${suite}.sh"
 
     if [[ ${KERNEL_TYPE} == "vendor" ]]; then
-        kernels+="{\"suite\":\"${suite}\"},"
+        # The kernel must be built on the same Ubuntu release as the suite
+        case "${KERNEL_BUILD_HOST}" in
+            jammy) runner="ubuntu-22.04" ;;
+            noble) runner="ubuntu-24.04" ;;
+            *)
+                echo "Error: no GitHub runner for Ubuntu ${KERNEL_BUILD_HOST}" >&2
+                exit 1
+                ;;
+        esac
+        kernels+="{\"suite\":\"${suite}\",\"runner\":\"${runner}\"},"
     fi
 
     for flavor in "${COMPATIBLE_FLAVORS[@]}"; do
