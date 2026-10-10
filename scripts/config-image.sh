@@ -35,41 +35,32 @@ fi
 # shellcheck source=/dev/null
 source "../config/flavors/${FLAVOR}.sh"
 
+# Find the newest deb matching a pattern in a build directory
+find_deb() {
+    local dir="$1"
+    local pattern="$2"
+    local deb
+
+    deb="$(find "${dir}" -maxdepth 1 -name "${pattern}" 2> /dev/null | sort | tail -n1)"
+    if [ ! -e "${deb}" ]; then
+        echo "Error: could not find ${pattern} in build/${dir}" >&2
+        exit 1
+    fi
+    echo "${deb}"
+}
+
 if [[ ${LAUNCHPAD} != "Y" ]]; then
-    uboot_package="$(basename "$(find u-boot-"${BOARD}"_*.deb | sort | tail -n1)")"
-    if [ ! -e "$uboot_package" ]; then
-        echo 'Error: could not find the u-boot package'
-        exit 1
-    fi
+    uboot_deb="$(find_deb "${UBOOT_PACKAGE}" "u-boot-${BOARD}_*.deb")"
 
-    linux_image_package="$(basename "$(find linux-image-*.deb | sort | tail -n1)")"
-    if [ ! -e "$linux_image_package" ]; then
-        echo "Error: could not find the linux image package"
-        exit 1
-    fi
-
-    linux_headers_package="$(basename "$(find linux-headers-*.deb | sort | tail -n1)")"
-    if [ ! -e "$linux_headers_package" ]; then
-        echo "Error: could not find the linux headers package"
-        exit 1
-    fi
-
-    linux_modules_package="$(basename "$(find linux-modules-*.deb | sort | tail -n1)")"
-    if [ ! -e "$linux_modules_package" ]; then
-        echo "Error: could not find the linux modules package"
-        exit 1
-    fi
-
-    linux_buildinfo_package="$(basename "$(find linux-buildinfo-*.deb | sort | tail -n1)")"
-    if [ ! -e "$linux_buildinfo_package" ]; then
-        echo "Error: could not find the linux buildinfo package"
-        exit 1
-    fi
-
-    linux_rockchip_headers_package="$(basename "$(find linux-rockchip-headers-*.deb | sort | tail -n1)")"
-    if [ ! -e "$linux_rockchip_headers_package" ]; then
-        echo "Error: could not find the linux rockchip headers package"
-        exit 1
+    if [[ ${KERNEL_TYPE} == "vendor" ]]; then
+        # Kernel packages are built per suite in build/kernel-${SUITE}
+        kernel_packages=(
+            "$(find_deb "kernel-${SUITE}" 'linux-image-*.deb')"
+            "$(find_deb "kernel-${SUITE}" 'linux-headers-*.deb')"
+            "$(find_deb "kernel-${SUITE}" 'linux-modules-*.deb')"
+            "$(find_deb "kernel-${SUITE}" 'linux-buildinfo-*.deb')"
+            "$(find_deb "kernel-${SUITE}" 'linux-rockchip-headers-*.deb')"
+        )
     fi
 fi
 
@@ -144,17 +135,20 @@ fi
 if [[ ${LAUNCHPAD} == "Y" ]]; then
     chroot ${chroot_dir} apt-get -y install "u-boot-${BOARD}"
 else
-    cp "${uboot_package}" ${chroot_dir}/tmp/
-    chroot ${chroot_dir} dpkg -i "/tmp/${uboot_package}"
-    chroot ${chroot_dir} apt-mark hold "$(echo "${uboot_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
+    cp "${uboot_deb}" ${chroot_dir}/tmp/
+    chroot ${chroot_dir} dpkg -i "/tmp/$(basename "${uboot_deb}")"
+    chroot ${chroot_dir} apt-mark hold "$(dpkg-deb -f "${uboot_deb}" Package)"
 
-    cp "${linux_image_package}" "${linux_headers_package}" "${linux_modules_package}" "${linux_buildinfo_package}" "${linux_rockchip_headers_package}" ${chroot_dir}/tmp/
-    chroot ${chroot_dir} /bin/bash -c "apt-get -y purge \$(dpkg --list | grep -Ei 'linux-image|linux-headers|linux-modules|linux-rockchip' | awk '{ print \$2 }')"
-    chroot ${chroot_dir} /bin/bash -c "dpkg -i /tmp/{${linux_image_package},${linux_modules_package},${linux_buildinfo_package},${linux_rockchip_headers_package}}"
-    chroot ${chroot_dir} apt-mark hold "$(echo "${linux_image_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
-    chroot ${chroot_dir} apt-mark hold "$(echo "${linux_modules_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
-    chroot ${chroot_dir} apt-mark hold "$(echo "${linux_buildinfo_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
-    chroot ${chroot_dir} apt-mark hold "$(echo "${linux_rockchip_headers_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
+    if [[ ${KERNEL_TYPE} == "vendor" ]]; then
+        # Replace the kernel from the rootfs with the one we built
+        cp "${kernel_packages[@]}" ${chroot_dir}/tmp/
+        chroot ${chroot_dir} /bin/bash -c "apt-get -y purge \$(dpkg --list | grep -Ei 'linux-image|linux-headers|linux-modules|linux-rockchip' | awk '{ print \$2 }')"
+        # shellcheck disable=SC2046
+        chroot ${chroot_dir} dpkg -i $(for deb in "${kernel_packages[@]}"; do echo "/tmp/$(basename "${deb}")"; done)
+        for deb in "${kernel_packages[@]}"; do
+            chroot ${chroot_dir} apt-mark hold "$(dpkg-deb -f "${deb}" Package)"
+        done
+    fi
 fi
 
 # Update the initramfs
