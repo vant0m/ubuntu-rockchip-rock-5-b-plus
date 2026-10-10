@@ -2,16 +2,17 @@
 
 # Make sure arm64 binaries from recent Ubuntu releases run in a chroot.
 #
-# Recent releases use syscalls (openat2, fchmodat2) that QEMU only emulates
-# since version 9.1, while Ubuntu 24.04 ships QEMU 8.2. Suites needing a
-# newer QEMU set QEMU_MIN_VERSION. When the host QEMU is older, take the
-# static qemu-aarch64 from Ubuntu 26.04 and register it with binfmt_misc
-# next to the host one. The newest registration wins, and registrations do
-# not survive a reboot, so the host setup is left untouched.
+# Ubuntu 26.04 and later use syscalls (openat2, fchmodat2) that QEMU only
+# emulates since version 9.1, and dpkg hangs in a noble chroot under the
+# QEMU 8.2 of Ubuntu 24.04. Suites needing a newer QEMU set
+# QEMU_MIN_VERSION. When the host QEMU is older, take the static
+# qemu-aarch64 from Ubuntu 26.04 and register it with binfmt_misc next to
+# the host one. The newest registration wins, and registrations do not
+# survive a reboot, so the host setup is left untouched.
 #
-# Older releases keep the host QEMU: apt from Ubuntu 22.04 can fail with
-# ENOMEM under QEMU 10, so a registration left by a previous build of a
-# newer release is removed.
+# Other suites keep the host QEMU: apt from Ubuntu 22.04 can fail with
+# ENOMEM under QEMU 10, so a registration left by a previous build of
+# another suite is removed.
 
 set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR

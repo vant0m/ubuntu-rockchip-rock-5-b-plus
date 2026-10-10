@@ -70,7 +70,7 @@ sudo ./build.sh --board=rock-5b-plus --suite=resolute --flavor=server
 
 Images end up in `images/`. The build directory keeps one kernel tree per suite (`build/kernel-<suite>`), one tree per U-Boot package (`build/u-boot-*`) and one live-build directory per suite and flavor, so several releases can be built from the same checkout. A kernel tree alone takes about 13 GB.
 
-On an x86_64 host the arm64 rootfs is built under QEMU user emulation. Ubuntu 26.04 and later use syscalls that QEMU only emulates since 9.1, while Ubuntu 24.04 ships 8.2. When the host QEMU is too old, `build.sh` downloads the static `qemu-aarch64` of Ubuntu 26.04 and registers it with binfmt_misc (until the next reboot, the host packages are not touched).
+On an x86_64 host the arm64 rootfs is built under QEMU user emulation. Ubuntu 26.04 and later use syscalls that QEMU only emulates since 9.1, and dpkg hangs in a 24.04 chroot under QEMU 8.2, the version Ubuntu 24.04 ships. For these releases, when the host QEMU is too old, `build.sh` downloads the static `qemu-aarch64` of Ubuntu 26.04 and registers it with binfmt_misc (until the next reboot, the host packages are not touched).
 
 On GitHub, the [Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml) workflow builds the images (all releases, or only the suites and flavors you pick), and the Release workflow attaches them to a draft release.
 

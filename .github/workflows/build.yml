@@ -55,6 +55,7 @@ jobs:
   rootfs:
     runs-on: ubuntu-24.04
     name: Build rootfs ${{ matrix.suite }} ${{ matrix.flavor }}
+    timeout-minutes: 180
     needs: [config]
     strategy:
       fail-fast: false
@@ -81,6 +82,7 @@ jobs:
   kernel:
     runs-on: ${{ matrix.runner }}
     name: Build kernel ${{ matrix.suite }}
+    timeout-minutes: 240
     needs: [config]
     if: needs.config.outputs.has_kernels == 'true'
     strategy:
@@ -107,6 +109,7 @@ jobs:
   image:
     runs-on: ubuntu-24.04
     name: Build image ${{ matrix.suite }} ${{ matrix.flavor }}
+    timeout-minutes: 120
     needs: [config, rootfs, kernel]
     # The kernel job is skipped when only mainline suites are built
     if: ${{ !cancelled() && needs.config.result == 'success' }}
