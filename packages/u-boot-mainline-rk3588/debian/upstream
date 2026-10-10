@@ -1,0 +1,3 @@
+GIT=https://github.com/u-boot/u-boot.git
+COMMIT=5508406582f6f7120dce0c4b3059819a41788db2
+BRANCH=v2026.10

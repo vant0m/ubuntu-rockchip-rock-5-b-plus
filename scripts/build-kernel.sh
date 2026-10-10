@@ -19,6 +19,23 @@ fi
 # shellcheck source=/dev/null
 source "../config/suites/${SUITE}.sh"
 
+if [[ ${KERNEL_TYPE} != "vendor" ]]; then
+    echo "Nothing to build: the ${SUITE} suite uses the kernel from the Ubuntu archive"
+    exit 0
+fi
+
+host_codename="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+if [[ -n ${KERNEL_BUILD_HOST} && ${host_codename} != "${KERNEL_BUILD_HOST}" ]]; then
+    echo "Error: the ${SUITE} kernel must be built on Ubuntu ${KERNEL_BUILD_HOST}, this host runs ${host_codename}"
+    echo "The kernel packages take their dependencies from the host libraries, so"
+    echo "linux-headers built here would not install on ${SUITE}."
+    exit 1
+fi
+
+# Each suite gets its own directory so kernels from different suites never
+# get mixed up, the debs end up in build/kernel-${SUITE}
+mkdir -p "kernel-${SUITE}" && cd "kernel-${SUITE}"
+
 # Clone the kernel repo
 if ! git -C linux-rockchip pull; then
     git clone --progress -b "${KERNEL_BRANCH}" "${KERNEL_REPO}" linux-rockchip --depth=2

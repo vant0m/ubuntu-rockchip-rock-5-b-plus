@@ -1,0 +1,29 @@
+name: Setup build host
+description: Free disk space and install the packages needed to build images
+
+runs:
+  using: composite
+  steps:
+    - name: Get more disk space
+      uses: jlumbroso/free-disk-space@v2.0.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        swap-storage: true
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get purge -y needrestart
+        sudo apt-get upgrade -y
+        sudo apt-get install -y build-essential gcc-aarch64-linux-gnu bison flex bc \
+          qemu-user-static binfmt-support debootstrap u-boot-tools libssl-dev rsync \
+          kmod cpio xz-utils zstd lz4 fakeroot parted udev dosfstools uuid-runtime \
+          device-tree-compiler python3 python-is-python3 fdisk debhelper \
+          python3-pyelftools python3-setuptools python3-pkg-resources swig \
+          libfdt-dev libpython3-dev libgnutls28-dev uuid-dev libelf-dev dwarves \
+          dctrl-tools gpgv ubuntu-keyring curl
