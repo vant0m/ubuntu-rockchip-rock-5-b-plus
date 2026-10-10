@@ -136,7 +136,7 @@ if [[ ${LAUNCHPAD} == "Y" ]]; then
     chroot ${chroot_dir} apt-get -y install "u-boot-${BOARD}"
 else
     cp "${uboot_deb}" ${chroot_dir}/tmp/
-    chroot ${chroot_dir} dpkg -i "/tmp/$(basename "${uboot_deb}")"
+    chroot ${chroot_dir} apt-get -y install "/tmp/$(basename "${uboot_deb}")"
     chroot ${chroot_dir} apt-mark hold "$(dpkg-deb -f "${uboot_deb}" Package)"
 
     if [[ ${KERNEL_TYPE} == "vendor" ]]; then
