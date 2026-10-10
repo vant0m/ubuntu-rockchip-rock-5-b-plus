@@ -2,10 +2,6 @@ name: Build
 run-name: Build ${{ inputs.board || 'rock-5b-plus' }} ${{ inputs.suites }} ${{ inputs.flavors }}
 
 on:
-  # Temporary: run once on the development branch before it is merged
-  push:
-    branches:
-      - claude/vibrant-rubin-yjksxz
   workflow_dispatch:
     inputs:
       board:
