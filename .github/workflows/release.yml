@@ -36,6 +36,19 @@ jobs:
           path: ./images/
           merge-multiple: true
 
+      # GitHub refuses release assets larger than 2 GiB, which the desktop
+      # images exceed once the snaps are seeded
+      - name: Split large images
+        working-directory: ./images
+        run: |
+          for image in *.img.xz; do
+              if [ "$(stat -c %s "${image}")" -gt 2147483648 ]; then
+                  split --bytes=2000M --numeric-suffixes=1 --suffix-length=1 "${image}" "${image}.part"
+                  rm "${image}"
+              fi
+          done
+          ls -l
+
       - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
@@ -43,6 +56,13 @@ jobs:
           target_commitish: ${{ github.sha }}
           draft: true
           fail_on_unmatched_files: true
-          files: |
-            images/*.img.xz
-            images/*.img.xz.sha256
+          body: |
+            Ubuntu images for the Radxa ROCK 5B+, see the README for the supported releases.
+
+            Images larger than 2 GiB are split in parts because of the GitHub size limit. Join them before writing the image, the `.sha256` file is for the joined image:
+
+            ```bash
+            cat ubuntu-26.04-preinstalled-desktop-arm64-rock-5b-plus.img.xz.part* > ubuntu-26.04-preinstalled-desktop-arm64-rock-5b-plus.img.xz
+            sha256sum -c ubuntu-26.04-preinstalled-desktop-arm64-rock-5b-plus.img.xz.sha256
+            ```
+          files: images/*
