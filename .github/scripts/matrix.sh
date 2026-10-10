@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Print the GitHub Actions build matrices for a board as key=value lines,
-# meant to be appended to $GITHUB_OUTPUT.
+# Print the GitHub Actions build matrices for the ROCK 5B+ as key=value
+# lines, meant to be appended to $GITHUB_OUTPUT.
 #
-# Usage: matrix.sh BOARD [SUITES] [FLAVORS]
+# Usage: matrix.sh [SUITES] [FLAVORS]
 #   SUITES and FLAVORS are space separated lists, empty means every suite
 #   or flavor the board config declares as compatible.
 
@@ -12,14 +12,9 @@ trap 'echo Error: in $0 on line $LINENO' ERR
 
 cd "$(dirname -- "$(readlink -f -- "$0")")" && cd ../..
 
-board="$1"
-wanted_suites="$2"
-wanted_flavors="$3"
-
-if [ ! -f "config/boards/${board}.sh" ]; then
-    echo "Error: \"${board}\" is an unsupported board" >&2
-    exit 1
-fi
+board="rock-5b-plus"
+wanted_suites="$1"
+wanted_flavors="$2"
 
 COMPATIBLE_SUITES=()
 COMPATIBLE_FLAVORS=()
@@ -61,7 +56,7 @@ for suite in "${COMPATIBLE_SUITES[@]}"; do
 done
 
 if [ -z "${images}" ]; then
-    echo "Error: nothing to build for ${board} with suites \"${wanted_suites}\" and flavors \"${wanted_flavors}\"" >&2
+    echo "Error: nothing to build with suites \"${wanted_suites}\" and flavors \"${wanted_flavors}\"" >&2
     exit 1
 fi
 
