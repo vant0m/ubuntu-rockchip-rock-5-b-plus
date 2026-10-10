@@ -203,15 +203,16 @@ if [ -z "${BOARD}" ] || [ -z "${SUITE}" ] || [ -z "${FLAVOR}" ]; then
 fi
 
 # Build the Linux kernel if not found
-if [[ ${LAUNCHPAD} != "Y" ]]; then
-    if [[ ! -e "$(find build/linux-image-*.deb | sort | tail -n1)" || ! -e "$(find build/linux-headers-*.deb | sort | tail -n1)" ]]; then
+if [[ ${LAUNCHPAD} != "Y" && ${KERNEL_TYPE} == "vendor" ]]; then
+    if [[ ! -e "$(find build/kernel-"${SUITE}" -maxdepth 1 -name 'linux-image-*.deb' 2> /dev/null | sort | tail -n1)" || \
+          ! -e "$(find build/kernel-"${SUITE}" -maxdepth 1 -name 'linux-headers-*.deb' 2> /dev/null | sort | tail -n1)" ]]; then
         ./scripts/build-kernel.sh
     fi
 fi
 
 # Build U-Boot if not found
 if [[ ${LAUNCHPAD} != "Y" ]]; then
-    if [[ ! -e "$(find build/u-boot-"${BOARD}"_*.deb | sort | tail -n1)" ]]; then
+    if [[ ! -e "$(find build/"${UBOOT_PACKAGE}" -maxdepth 1 -name "u-boot-${BOARD}_*.deb" 2> /dev/null | sort | tail -n1)" ]]; then
         ./scripts/build-u-boot.sh
     fi
 fi

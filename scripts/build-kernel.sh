@@ -19,6 +19,15 @@ fi
 # shellcheck source=/dev/null
 source "../config/suites/${SUITE}.sh"
 
+if [[ ${KERNEL_TYPE} != "vendor" ]]; then
+    echo "Nothing to build: the ${SUITE} suite uses the kernel from the Ubuntu archive"
+    exit 0
+fi
+
+# Each suite gets its own directory so kernels from different suites never
+# get mixed up, the debs end up in build/kernel-${SUITE}
+mkdir -p "kernel-${SUITE}" && cd "kernel-${SUITE}"
+
 # Clone the kernel repo
 if ! git -C linux-rockchip pull; then
     git clone --progress -b "${KERNEL_BRANCH}" "${KERNEL_REPO}" linux-rockchip --depth=2
