@@ -178,6 +178,11 @@ if [ "${KERNEL_ONLY}" == "Y" ]; then
     exit 0
 fi
 
+if [[ ${LAUNCHPAD} == "Y" && -n ${SUITE} && ${KERNEL_TYPE} != "vendor" ]]; then
+    echo "Error: --launchpad only applies to suites using the Rockchip BSP kernel from the PPA"
+    exit 1
+fi
+
 # Recent Ubuntu releases need a recent QEMU to run arm64 binaries in a chroot
 if [ "${UBOOT_ONLY}" != "Y" ]; then
     ./scripts/setup-qemu.sh
