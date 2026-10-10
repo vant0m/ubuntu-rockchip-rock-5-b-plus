@@ -3,9 +3,9 @@
 [![Lint](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/lint.yml/badge.svg)](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/lint.yml)
 [![Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml/badge.svg)](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml)
 
-Ubuntu images for the [Radxa ROCK 5B+](https://radxa.com/products/rock5/5bp/) (Rockchip RK3588).
+Ubuntu images for the [Radxa ROCK 5B+](https://radxa.com/products/rock5/5bp/) (Rockchip RK3588), and only for this board.
 
-This is a fork of [Joshua-Riek/ubuntu-rockchip](https://github.com/Joshua-Riek/ubuntu-rockchip), which was archived in April 2026. It focuses on a single board, the ROCK 5B+, and adds Ubuntu 26.04 LTS and 26.10 images built entirely from the official Ubuntu archive and mainline U-Boot.
+This project started as a fork of [Joshua-Riek/ubuntu-rockchip](https://github.com/Joshua-Riek/ubuntu-rockchip), which supported about thirty Rockchip boards and was archived in April 2026. Everything that did not concern the ROCK 5B+ has been removed, and Ubuntu 26.04 LTS and 26.10 images were added, built entirely from the official Ubuntu archive and mainline U-Boot. Other boards are not supported, use the original project or [Armbian](https://www.armbian.com/) for them.
 
 ## Supported releases
 
@@ -60,7 +60,7 @@ For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
 The build runs as root on an Ubuntu 24.04 x86_64 host, like the GitHub runners. The one exception is the 22.04 kernel, which must be built on Ubuntu 22.04: the kernel packages take their dependencies from the host libraries. Install the build dependencies listed in [`.github/actions/setup/action.yml`](.github/actions/setup/action.yml), then:
 
 ```bash
-sudo ./build.sh --board=rock-5b-plus --suite=resolute --flavor=server
+sudo ./build.sh --suite=resolute --flavor=server
 ```
 
 * `--suite`: `jammy`, `noble`, `resolute` or `stonking`
@@ -72,7 +72,7 @@ Images end up in `images/`. The build directory keeps one kernel tree per suite 
 
 On an x86_64 host the arm64 rootfs is built under QEMU user emulation. Ubuntu 26.04 and later use syscalls that QEMU only emulates since 9.1, and dpkg hangs in a 24.04 chroot under QEMU 8.2, the version Ubuntu 24.04 ships. For these releases, when the host QEMU is too old, `build.sh` downloads the static `qemu-aarch64` of Ubuntu 26.04 and registers it with binfmt_misc (until the next reboot, the host packages are not touched).
 
-On GitHub, the [Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml) workflow builds the images (all releases, or only the suites and flavors you pick), and the Release workflow attaches them to a draft release.
+On GitHub, the [Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml) workflow builds the images (all releases, or only the suites and flavors you pick), and the [Release](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/release.yml) workflow builds them again and publishes them in a release (a draft by default, or a pre-release or release).
 
 ## Credits
 

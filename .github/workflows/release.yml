@@ -5,9 +5,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag of the draft release to create, for example v2.5.0
+        description: Tag of the release to create, for example v1.0.0
         type: string
         required: true
+      draft:
+        description: Create a draft release, to review and publish by hand
+        type: boolean
+        default: true
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: false
       suites:
         description: Space separated suites, leave empty for every compatible suite
         type: string
@@ -21,11 +29,10 @@ jobs:
     name: Build
     uses: ./.github/workflows/build.yml
     with:
-      board: rock-5b-plus
       suites: ${{ inputs.suites }}
 
   release:
-    name: Create draft release
+    name: Create release
     runs-on: ubuntu-24.04
     needs: [build]
     steps:
@@ -49,12 +56,13 @@ jobs:
           done
           ls -l
 
-      - name: Create draft release
+      - name: Create release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ github.sha }}
-          draft: true
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: true
           body: |
             Ubuntu images for the Radxa ROCK 5B+, see the README for the supported releases.
