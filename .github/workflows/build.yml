@@ -1,5 +1,5 @@
 name: Build
-run-name: Build ${{ inputs.board }} ${{ inputs.suites }} ${{ inputs.flavors }}
+run-name: Build ${{ inputs.board || 'rock-5b-plus' }} ${{ inputs.suites }} ${{ inputs.flavors }}
 
 on:
   # Temporary: run once on the development branch before it is merged
@@ -79,7 +79,7 @@ jobs:
           retention-days: 3
 
   kernel:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     name: Build kernel ${{ matrix.suite }}
     needs: [config]
     if: needs.config.outputs.has_kernels == 'true'
