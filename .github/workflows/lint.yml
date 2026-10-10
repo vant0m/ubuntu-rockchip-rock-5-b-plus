@@ -1,0 +1,19 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    name: ShellCheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck -x build.sh scripts/*.sh .github/scripts/*.sh \
+            config/boards/*.sh config/suites/*.sh config/flavors/*.sh \
+            config/livecd-rootfs/*.chroot

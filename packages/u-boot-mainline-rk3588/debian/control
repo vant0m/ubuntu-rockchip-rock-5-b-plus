@@ -1,0 +1,42 @@
+Source: u-boot-mainline-rk3588
+Section: admin
+Priority: optional
+Maintainer: vant0m <vant0m@users.noreply.github.com>
+Build-Depends: 
+ debhelper-compat (= 12),
+ gcc,
+ make,
+ bc,
+ bison,
+ flex,
+ device-tree-compiler,
+ python3,
+ libpython3-dev,
+ python3-pyelftools,
+ python3-setuptools,
+ swig,
+ libfdt-dev,
+ libssl-dev,
+ libgnutls28-dev,
+ uuid-dev,
+Standards-Version: 4.6.0
+Homepage: https://u-boot.org/
+Vcs-Browser: https://source.denx.de/u-boot/u-boot
+Vcs-Git: https://source.denx.de/u-boot/u-boot.git
+
+Package: u-boot-rock-5b-plus
+Architecture: arm64
+Priority: optional
+Depends: mtd-utils
+Provides: u-boot
+Replaces: u-boot
+Conflicts: u-boot
+Description: A mainline boot loader for the Radxa ROCK 5B+.
+ Das U-Boot is a cross-platform bootloader for embedded systems,
+ used as the default boot loader by several board vendors.  It is
+ intended to be easy to port and to debug, and runs on many
+ supported architectures, including PPC, ARM, MIPS, x86, m68k,
+ NIOS, and Microblaze.
+ .
+ This package is built from mainline U-Boot (rock5b-rk3588_defconfig),
+ which also supports the ROCK 5B and ROCK 5T.

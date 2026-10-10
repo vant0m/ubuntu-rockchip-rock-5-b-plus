@@ -16,14 +16,24 @@ if [[ -z ${UBOOT_PACKAGE} ]]; then
     exit 1
 fi
 
-if [ ! -d "${UBOOT_PACKAGE}" ]; then
-    # shellcheck source=/dev/null
-    source ../packages/"${UBOOT_PACKAGE}"/debian/upstream
-    git clone --single-branch --progress -b "${BRANCH}" "${GIT}" "${UBOOT_PACKAGE}"
-    git -C "${UBOOT_PACKAGE}" checkout "${COMMIT}"
-    cp -r ../packages/"${UBOOT_PACKAGE}"/debian "${UBOOT_PACKAGE}"
+# Each u-boot package gets its own directory, the debs end up in
+# build/${UBOOT_PACKAGE} and the source tree in build/${UBOOT_PACKAGE}/u-boot
+mkdir -p "${UBOOT_PACKAGE}" && cd "${UBOOT_PACKAGE}"
+
+# shellcheck source=/dev/null
+source ../../packages/"${UBOOT_PACKAGE}"/debian/upstream
+if [ ! -d u-boot ]; then
+    git clone --single-branch --progress -b "${BRANCH}" "${GIT}" u-boot
 fi
-cd "${UBOOT_PACKAGE}"
+if ! git -C u-boot cat-file -e "${COMMIT}^{commit}" 2> /dev/null; then
+    git -C u-boot fetch origin "${BRANCH}"
+fi
+git -C u-boot checkout "${COMMIT}"
+
+# Always use the packaging from this repository, even for an existing tree
+rm -rf u-boot/debian
+cp -r ../../packages/"${UBOOT_PACKAGE}"/debian u-boot
+cd u-boot
 
 # Target package to build
 rules=${UBOOT_RULES_TARGET},package-${UBOOT_RULES_TARGET}
