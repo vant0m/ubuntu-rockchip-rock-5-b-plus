@@ -122,8 +122,17 @@ tar -xpJf "ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz" 
 # Mount the root filesystem
 setup_mountpoint $chroot_dir
 
-# Update packages
-chroot $chroot_dir apt-get update
+# Update packages. apt from 22.04 sometimes fails to read the indexes with
+# ENOMEM under emulation, so try again before giving up
+for attempt in 1 2 3; do
+    if chroot $chroot_dir apt-get update; then
+        break
+    elif [ "${attempt}" -eq 3 ]; then
+        echo "Error: apt-get update failed"
+        exit 1
+    fi
+    echo "Warning: apt-get update failed, trying again"
+done
 chroot $chroot_dir apt-get -y upgrade
     
 # Run config hook to handle board specific changes

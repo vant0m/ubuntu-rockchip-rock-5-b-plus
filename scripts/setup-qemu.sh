@@ -10,9 +10,8 @@
 # the host one. The newest registration wins, and registrations do not
 # survive a reboot, so the host setup is left untouched.
 #
-# Other suites keep the host QEMU: apt from Ubuntu 22.04 can fail with
-# ENOMEM under QEMU 10, so a registration left by a previous build of
-# another suite is removed.
+# Other suites keep the host QEMU, and a registration left by a previous
+# build of another suite is removed.
 
 set -eE
 trap 'echo Error: in $0 on line $LINENO' ERR

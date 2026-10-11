@@ -7,14 +7,14 @@ cd "$(dirname -- "$(readlink -f -- "$0")")"
 
 usage() {
 cat << HEREDOC
-Usage: $0 --board=[orangepi-5] --suite=[jammy|noble] --flavor=[server|desktop]
+Usage: $0 --suite=[jammy|noble|resolute|stonking] --flavor=[server|desktop]
 
 Required arguments:
-  -b, --board=BOARD      target board 
-  -s, --suite=SUITE      ubuntu suite 
+  -s, --suite=SUITE      ubuntu suite
   -f, --flavor=FLAVOR    ubuntu flavor
 
 Optional arguments:
+  -b,  --board=BOARD     target board (default: rock-5b-plus, the only one)
   -h,  --help            show this help message and exit
   -c,  --clean           clean the build directory
   -ko, --kernel-only     only compile the kernel
@@ -137,6 +137,9 @@ if [ -n "${FLAVOR}" ]; then
         exit 1
     done
 fi
+
+# The Radxa ROCK 5B+ is the only supported board
+export BOARD="${BOARD:-rock-5b-plus}"
 
 if [ "${BOARD}" == "help" ]; then
     for file in config/boards/*; do
