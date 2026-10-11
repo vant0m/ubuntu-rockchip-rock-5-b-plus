@@ -1,13 +1,9 @@
 name: Build
-run-name: Build ${{ inputs.board || 'rock-5b-plus' }} ${{ inputs.suites }} ${{ inputs.flavors }}
+run-name: Build ROCK 5B+ ${{ inputs.suites }} ${{ inputs.flavors }}
 
 on:
   workflow_dispatch:
     inputs:
-      board:
-        description: Board to build images for
-        type: string
-        default: rock-5b-plus
       suites:
         description: Space separated suites, leave empty for every compatible suite
         type: string
@@ -18,9 +14,6 @@ on:
         default: ""
   workflow_call:
     inputs:
-      board:
-        type: string
-        default: rock-5b-plus
       suites:
         type: string
         default: ""
@@ -43,13 +36,12 @@ jobs:
       - name: Create matrix
         id: matrix
         env:
-          BOARD: ${{ inputs.board || 'rock-5b-plus' }}
           SUITES: ${{ inputs.suites }}
           FLAVORS: ${{ inputs.flavors }}
-        run: .github/scripts/matrix.sh "${BOARD}" "${SUITES}" "${FLAVORS}" | tee -a "$GITHUB_OUTPUT"
+        run: .github/scripts/matrix.sh "${SUITES}" "${FLAVORS}" | tee -a "$GITHUB_OUTPUT"
 
   rootfs:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     name: Build rootfs ${{ matrix.suite }} ${{ matrix.flavor }}
     timeout-minutes: 180
     needs: [config]
@@ -103,7 +95,7 @@ jobs:
           retention-days: 3
 
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     name: Build image ${{ matrix.suite }} ${{ matrix.flavor }}
     timeout-minutes: 120
     needs: [config, rootfs, kernel]
