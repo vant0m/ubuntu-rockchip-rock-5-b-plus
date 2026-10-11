@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Replaces /usr/sbin/u-boot-update (the original is diverted to
+# /usr/sbin/u-boot-update.distrib). U-Boot cannot boot the EFI kernels of
+# Ubuntu, so extract their raw images first and point the extlinux entries
+# at them, see /usr/lib/ubuntu-rockchip/kernel-image.
+
+set -e
+
+if ! /usr/lib/ubuntu-rockchip/kernel-image update; then
+    echo "W: some kernels could not be extracted, U-Boot will not boot them" >&2
+fi
+
+/usr/sbin/u-boot-update.distrib "$@"
+
+/usr/lib/ubuntu-rockchip/kernel-image rewrite

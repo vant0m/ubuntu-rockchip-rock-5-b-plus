@@ -1,0 +1,152 @@
+#!/usr/bin/python3
+
+"""Extract bootable kernel images from the Ubuntu arm64 kernels.
+
+U-Boot boots extlinux entries with booti, which only accepts a raw arm64
+kernel Image (optionally gzip, bzip2, lzma or lz4 compressed). The Ubuntu
+generic kernels are EFI applications instead: /boot/vmlinuz-<version> is a
+PE file whose .linux section holds an EFI zboot image, itself wrapping the
+zstd or gzip compressed raw Image.
+
+  kernel-image update    extract /boot/Image-<version> for every kernel
+                         that booti cannot boot, remove stale images
+  kernel-image rewrite   point the extlinux entries at the extracted images
+"""
+
+import gzip
+import os
+import re
+import struct
+import subprocess
+import sys
+
+BOOT = "/boot"
+EXTLINUX = os.path.join(BOOT, "extlinux", "extlinux.conf")
+ARM64_MAGIC = b"ARM\x64"
+
+
+def is_raw_image(data):
+    return data[0x38:0x3C] == ARM64_MAGIC
+
+
+def pe_section(data, name):
+    """Return the raw data of a PE section, or None."""
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[pe:pe + 4] != b"PE\0\0":
+        return None
+    count = struct.unpack_from("<H", data, pe + 6)[0]
+    optional_size = struct.unpack_from("<H", data, pe + 20)[0]
+    offset = pe + 24 + optional_size
+    for _ in range(count):
+        if data[offset:offset + 8].rstrip(b"\0") == name:
+            virtual_size, _, raw_size, raw_offset = struct.unpack_from("<IIII", data, offset + 8)
+            return data[raw_offset:raw_offset + min(virtual_size, raw_size)]
+        offset += 40
+    return None
+
+
+def decompress(payload, method):
+    if method == "gzip":
+        return gzip.decompress(payload)
+    if method == "zstd":
+        try:
+            from compression import zstd
+            return zstd.decompress(payload)
+        except ImportError:
+            return subprocess.run(["zstd", "-dcq"], input=payload, stdout=subprocess.PIPE, check=True).stdout
+    raise ValueError(f"unsupported zboot compression {method}")
+
+
+def unzboot(data):
+    """Return the raw Image wrapped in an EFI zboot image."""
+    payload_offset, payload_size = struct.unpack_from("<II", data, 8)
+    method = data[24:56].split(b"\0")[0].decode()
+    return decompress(data[payload_offset:payload_offset + payload_size], method)
+
+
+def extract(data):
+    """Return the raw Image of a kernel, or None if booti can boot it as is."""
+    if is_raw_image(data) or data[:2] == b"\x1f\x8b":
+        return None
+    if data[:2] != b"MZ":
+        raise ValueError("unknown kernel format")
+
+    if data[4:8] != b"zimg":
+        # Not a zboot image itself: the kernel is in the .linux section
+        section = pe_section(data, b".linux")
+        if section is None:
+            raise ValueError("EFI application without a .linux section")
+        data = section
+        if is_raw_image(data):
+            return data
+        if data[:2] != b"MZ" or data[4:8] != b"zimg":
+            raise ValueError("unknown format in the .linux section")
+
+    image = unzboot(data)
+    if not is_raw_image(image):
+        raise ValueError("the decompressed kernel is not an arm64 Image")
+    return image
+
+
+def versions():
+    return [name[len("vmlinuz-"):] for name in os.listdir(BOOT) if name.startswith("vmlinuz-")]
+
+
+def update():
+    status = 0
+    installed = set(versions())
+
+    for version in sorted(installed):
+        kernel = os.path.join(BOOT, f"vmlinuz-{version}")
+        image = os.path.join(BOOT, f"Image-{version}")
+        if os.path.exists(image) and os.path.getmtime(image) >= os.path.getmtime(kernel):
+            continue
+        try:
+            with open(kernel, "rb") as f:
+                raw = extract(f.read())
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            print(f"E: could not extract the kernel image of {version}: {error}", file=sys.stderr)
+            status = 1
+            continue
+        if raw is None:
+            continue
+        print(f"P: Extracting {image}...", file=sys.stderr)
+        with open(image + ".tmp", "wb") as f:
+            f.write(raw)
+        os.chmod(image + ".tmp", os.stat(kernel).st_mode & 0o777)
+        os.replace(image + ".tmp", image)
+
+    # Remove the images of removed kernels
+    for name in os.listdir(BOOT):
+        if name.startswith("Image-") and name[len("Image-"):] not in installed:
+            os.remove(os.path.join(BOOT, name))
+
+    return status
+
+
+def rewrite():
+    if not os.path.exists(EXTLINUX):
+        return 0
+    with open(EXTLINUX) as f:
+        config = f.read()
+
+    def replace(match):
+        version = match.group(3)
+        if os.path.exists(os.path.join(BOOT, f"Image-{version}")):
+            return f"{match.group(1)}{match.group(2)}Image-{version}"
+        return match.group(0)
+
+    new = re.sub(r"^(\s*linux\s+)(\S*/)vmlinuz-(\S+)$", replace, config, flags=re.MULTILINE)
+    if new != config:
+        with open(EXTLINUX + ".tmp", "w") as f:
+            f.write(new)
+        os.replace(EXTLINUX + ".tmp", EXTLINUX)
+    return 0
+
+
+if __name__ == "__main__":
+    commands = {"update": update, "rewrite": rewrite}
+    if len(sys.argv) != 2 or sys.argv[1] not in commands:
+        print(f"Usage: {sys.argv[0]} update|rewrite", file=sys.stderr)
+        sys.exit(2)
+    sys.exit(commands[sys.argv[1]]())
