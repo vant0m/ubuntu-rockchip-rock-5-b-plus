@@ -51,6 +51,16 @@ function config_image_hook__rock-5b-plus() {
         # kernel anyway so a failed detection cannot boot the ROCK 5B one
         mkdir -p "${rootfs}/etc/u-boot-menu/conf.d"
         echo 'U_BOOT_FDT="device-tree/rockchip/rk3588-rock-5b-plus.dtb"' > "${rootfs}/etc/u-boot-menu/conf.d/rock-5b-plus.conf"
+
+        # The Ubuntu generic kernel is an EFI application that the booti
+        # command of U-Boot refuses. Wrap u-boot-update so the raw kernel
+        # Image is extracted and used by extlinux, including for kernels
+        # installed later by apt.
+        install -D -m 755 "${overlay}/usr/lib/ubuntu-rockchip/kernel-image" "${rootfs}/usr/lib/ubuntu-rockchip/kernel-image"
+        install -D -m 755 "${overlay}/usr/lib/ubuntu-rockchip/u-boot-update" "${rootfs}/usr/lib/ubuntu-rockchip/u-boot-update"
+        chroot "${rootfs}" dpkg-divert --local --rename --divert /usr/sbin/u-boot-update.distrib --add /usr/sbin/u-boot-update
+        ln -sf /usr/lib/ubuntu-rockchip/u-boot-update "${rootfs}/usr/sbin/u-boot-update"
+        chroot "${rootfs}" u-boot-update
     fi
 
     return 0
