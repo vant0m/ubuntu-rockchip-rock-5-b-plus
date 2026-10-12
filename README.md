@@ -58,6 +58,15 @@ For Ubuntu Server you will be able to login through HDMI, a serial console conne
 
 For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
 
+## Reporting problems
+
+[`scripts/hw-report.sh`](scripts/hw-report.sh) collects what the system detected, the loaded drivers and the errors of the current boot. Run it on the board and attach its output to your issue:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/vant0m/ubuntu-rockchip-rock-5-b-plus/main/scripts/hw-report.sh
+sudo bash hw-report.sh > hw-report.txt
+```
+
 ## Building the images
 
 The build runs as root on an Ubuntu 24.04 x86_64 host, like the GitHub runners. The one exception is the 22.04 kernel, which must be built on Ubuntu 22.04: the kernel packages take their dependencies from the host libraries. Install the build dependencies listed in [`.github/actions/setup/action.yml`](.github/actions/setup/action.yml), then:
