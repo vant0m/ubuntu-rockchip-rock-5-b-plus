@@ -58,6 +58,19 @@ For Ubuntu Server you will be able to login through HDMI, a serial console conne
 
 For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
 
+## Install to the eMMC or an NVMe drive
+
+The images run from the SD card, but the eMMC module or an NVMe drive is much faster. Once the system runs from the SD card, copy it with:
+
+```bash
+sudo ubuntu-rockchip-install         # to the eMMC or the NVMe drive, when there is only one of them
+sudo ubuntu-rockchip-install emmc    # or nvme, or a disk like /dev/sda
+```
+
+The disk is erased and partitioned like the image, and the running system is copied to it, with all its configuration. U-Boot is written to the eMMC, or to the SPI flash for an NVMe drive, as the RK3588 cannot load U-Boot from NVMe. Power off, remove the SD card, and the board boots from the new disk. U-Boot looks for a system on the SD card first, then the eMMC, then NVMe: the SD card stays usable as a rescue system.
+
+The server image can also install itself without being used from the SD card first. After writing it to the SD card, create an empty file named `install-to-emmc`, or `install-to-nvme`, on its small `CIDATA` partition, which any computer can open. On its first boot, the image installs itself to that disk, the blue LED blinking fast, then the board powers off: remove the SD card and power it on again. The first boot setup (password, SSH keys) then runs on the new disk. The file is renamed with a `.done` suffix, or `.failed` with the blue LED left on, next to the log of the installation.
+
 ## Reporting problems
 
 [`scripts/hw-report.sh`](scripts/hw-report.sh) collects what the system detected, the loaded drivers and the errors of the current boot. Run it on the board and attach its output to your issue:

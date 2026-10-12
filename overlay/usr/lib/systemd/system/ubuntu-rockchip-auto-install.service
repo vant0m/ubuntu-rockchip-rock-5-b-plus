@@ -1,0 +1,19 @@
+[Unit]
+Description=Install the system to the eMMC or NVMe drive when asked on the CIDATA partition
+Documentation=https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus#install-to-the-emmc-or-an-nvme-drive
+# Only on the first boot, before cloud-init runs its first boot setup, which
+# then runs on the installed system instead
+DefaultDependencies=no
+After=local-fs.target systemd-remount-fs.service systemd-udev-trigger.service
+Before=sysinit.target cloud-init-local.service cloud-init-main.service shutdown.target
+Conflicts=shutdown.target
+ConditionPathExists=!/var/lib/ubuntu-rockchip/auto-install.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ubuntu-rockchip-install --auto
+StandardOutput=journal+console
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=sysinit.target
