@@ -260,10 +260,11 @@ EOF
 led_trigger() {
     local led
     for led in /sys/class/leds/*status*; do
-        echo "$1" > "${led}/trigger" 2> /dev/null || return 0
+        [ -w "${led}/trigger" ] || continue
+        echo "$1" > "${led}/trigger" || return 0
         if [ "$1" = timer ]; then
-            echo 100 > "${led}/delay_on"
-            echo 100 > "${led}/delay_off"
+            echo 100 > "${led}/delay_on" || true
+            echo 100 > "${led}/delay_off" || true
         fi
         return 0
     done
@@ -342,7 +343,8 @@ auto_install() {
 
     led_trigger none
     log "Powering off"
-    systemctl poweroff --no-block
+    # D-Bus does not run yet, do not ask logind about inhibitors
+    systemctl poweroff --no-block --check-inhibitors=no
 }
 
 main() {
