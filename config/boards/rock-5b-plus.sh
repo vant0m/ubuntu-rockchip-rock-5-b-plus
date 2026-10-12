@@ -58,6 +58,17 @@ function config_image_hook__rock-5b-plus() {
         mkdir -p "${rootfs}/etc/modules-load.d"
         echo "ledtrig-heartbeat" > "${rootfs}/etc/modules-load.d/rock-5b-plus.conf"
 
+        # Tyr, the experimental Rust driver for the Mali GPU, matches the same
+        # device as Panthor. Whichever probes first gets the GPU, and Mesa
+        # only works with Panthor
+        mkdir -p "${rootfs}/etc/modprobe.d"
+        echo "blacklist tyr" > "${rootfs}/etc/modprobe.d/rock-5b-plus.conf"
+
+        # Keep the clock across reboots, the images use chrony and not
+        # systemd-timesyncd, which would do it
+        cp "${overlay}/usr/lib/systemd/system/ubuntu-rockchip-save-clock.service" "${rootfs}/usr/lib/systemd/system/"
+        chroot "${rootfs}" systemctl enable ubuntu-rockchip-save-clock
+
         # The Ubuntu generic kernel is an EFI application that the booti
         # command of U-Boot refuses. Wrap u-boot-update so the raw kernel
         # Image is extracted and used by extlinux, including for kernels

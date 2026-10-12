@@ -50,7 +50,7 @@ sudo u-boot-install-mtd            # the SPI flash
 
 Insert your SD card into the slot on the board and power on the device. The first boot may take up to two minutes, so please be patient. On the 26.04 and 26.10 images, the green LED shows that the board is powered, and the blue status LED stays on while U-Boot runs, then blinks (heartbeat) once Linux has started. A serial console is available on the debug UART at 1500000 baud.
 
-Connect the network before the first boot if you can. The board does not keep the time while it is off, so the clock is wrong until NTP sets it once the network is up. At that moment, all the periodic maintenance tasks (apt, fwupd, ...) look overdue and start at once, on top of the first boot work of cloud-init and snapd, and the system can be slow for a few minutes. This happens mostly on the first boot, and is much shorter on a fast SD card, the eMMC or an NVMe drive.
+Connect the network before the first boot if you can. Without a battery on the RTC connector, the board does not keep the time while it is off: the 26.04 and 26.10 images start the clock at the time of the last shutdown, or of the image build on the first boot, until NTP sets it once the network is up. At that moment, the periodic maintenance tasks (apt, fwupd, ...) that look overdue start at once, on top of the first boot work of cloud-init and snapd, and the system can be slow for a few minutes. This happens mostly on the first boot, and is much shorter on a fast SD card, the eMMC or an NVMe drive.
 
 ## Login information
 

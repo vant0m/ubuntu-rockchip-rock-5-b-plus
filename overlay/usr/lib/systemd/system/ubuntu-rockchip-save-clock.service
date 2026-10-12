@@ -1,0 +1,15 @@
+[Unit]
+Description=Save the system time for the next boot
+Documentation=man:systemd(1)
+# Without a battery for the RTC, the clock is lost at power off. systemd sets
+# the clock at boot to the mtime of /var/lib/systemd/timesync/clock at least,
+# which systemd-timesyncd keeps up to date, but Ubuntu uses chrony instead.
+# Update it every hour and at shutdown, so the clock starts at the last known
+# time and not months back until NTP sets it.
+
+[Service]
+ExecStart=/bin/sh -c 'mkdir -p /var/lib/systemd/timesync && while touch /var/lib/systemd/timesync/clock; do sleep 3600; done'
+ExecStopPost=/usr/bin/touch /var/lib/systemd/timesync/clock
+
+[Install]
+WantedBy=multi-user.target
