@@ -99,7 +99,10 @@ def update():
     for version in sorted(installed):
         kernel = os.path.join(BOOT, f"vmlinuz-{version}")
         image = os.path.join(BOOT, f"Image-{version}")
-        if os.path.exists(image) and os.path.getmtime(image) >= os.path.getmtime(kernel):
+        # dpkg gives the kernel the mtime of its build, which can be older
+        # than an image extracted from a previous build of the same version:
+        # compare with the ctime, the time the kernel was installed
+        if os.path.exists(image) and os.stat(image).st_mtime >= os.stat(kernel).st_ctime:
             continue
         try:
             with open(kernel, "rb") as f:
