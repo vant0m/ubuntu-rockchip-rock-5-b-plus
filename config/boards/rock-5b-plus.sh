@@ -52,6 +52,12 @@ function config_image_hook__rock-5b-plus() {
         mkdir -p "${rootfs}/etc/u-boot-menu/conf.d"
         echo 'U_BOOT_FDT="device-tree/rockchip/rk3588-rock-5b-plus.dtb"' > "${rootfs}/etc/u-boot-menu/conf.d/rock-5b-plus.conf"
 
+        # The device tree gives the blue status LED the heartbeat trigger,
+        # but the trigger is a module without alias that nothing loads: the
+        # LED would just turn off once Linux runs instead of blinking
+        mkdir -p "${rootfs}/etc/modules-load.d"
+        echo "ledtrig-heartbeat" > "${rootfs}/etc/modules-load.d/rock-5b-plus.conf"
+
         # The Ubuntu generic kernel is an EFI application that the booti
         # command of U-Boot refuses. Wrap u-boot-update so the raw kernel
         # Image is extracted and used by extlinux, including for kernels
