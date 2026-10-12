@@ -168,6 +168,11 @@ chroot ${chroot_dir} apt-get -y clean
 chroot ${chroot_dir} apt-get -y autoclean
 chroot ${chroot_dir} apt-get -y autoremove
 
+# The board has no battery for its clock by default: systemd starts the
+# clock at least at the mtime of this file, the build time of the image,
+# instead of its own build time, which can be months earlier
+touch "${chroot_dir}/usr/lib/clock-epoch"
+
 # Umount the root filesystem
 teardown_mountpoint $chroot_dir
 
