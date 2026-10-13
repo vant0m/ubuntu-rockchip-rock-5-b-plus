@@ -186,6 +186,17 @@ if [[ ${LAUNCHPAD} == "Y" && -n ${SUITE} && ${KERNEL_TYPE} != "vendor" ]]; then
     exit 1
 fi
 
+# Some flavors only exist for some kernels
+if [ -n "${FLAVOR}" ] && [ -n "${KERNEL_TYPE}" ]; then
+    # shellcheck source=/dev/null
+    # shellcheck disable=SC2153
+    flavor_kernel_types="$(source "config/flavors/${FLAVOR}.sh" && echo "${FLAVOR_KERNEL_TYPES}")"
+    if [ -n "${flavor_kernel_types}" ] && [[ " ${flavor_kernel_types} " != *" ${KERNEL_TYPE} "* ]]; then
+        echo "Error: the ${FLAVOR} flavor is not available for ${SUITE}"
+        exit 1
+    fi
+fi
+
 # Recent Ubuntu releases need a recent QEMU to run arm64 binaries in a chroot
 if [ "${UBOOT_ONLY}" != "Y" ]; then
     ./scripts/setup-qemu.sh

@@ -27,6 +27,7 @@ jobs:
     name: Create matrix
     outputs:
       images: ${{ steps.matrix.outputs.images }}
+      rootfs: ${{ steps.matrix.outputs.rootfs }}
       kernels: ${{ steps.matrix.outputs.kernels }}
       has_kernels: ${{ steps.matrix.outputs.has_kernels }}
     steps:
@@ -47,7 +48,7 @@ jobs:
     needs: [config]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.config.outputs.images) }}
+      matrix: ${{ fromJson(needs.config.outputs.rootfs) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -114,7 +115,7 @@ jobs:
       - name: Download rootfs
         uses: actions/download-artifact@v8
         with:
-          name: rootfs-ubuntu-${{ matrix.version }}-${{ matrix.flavor }}
+          name: rootfs-ubuntu-${{ matrix.version }}-${{ matrix.rootfs_flavor }}
           path: ./build/
 
       - name: Download kernel

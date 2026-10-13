@@ -7,6 +7,19 @@ Ubuntu images for the [Radxa ROCK 5B+](https://radxa.com/products/rock5/5bp/) (R
 
 This project started as a fork of [Joshua-Riek/ubuntu-rockchip](https://github.com/Joshua-Riek/ubuntu-rockchip), which supported about thirty Rockchip boards and was archived in April 2026. Everything that did not concern the ROCK 5B+ has been removed, and Ubuntu 26.04 LTS and 26.10 images were added, built entirely from the official Ubuntu archive and mainline U-Boot. Other boards are not supported, use the original project or [Armbian](https://www.armbian.com/) for them.
 
+**The focus is a working headless server**, the 26.04 and 26.10 server images first. Three flavors are built:
+
+| Flavor | Image | Status |
+|---|---|---|
+| Server | `ubuntu-<version>-preinstalled-server-arm64-rock-5b-plus.img.xz` | Supported |
+| Server diet | `ubuntu-<version>-preinstalled-server-diet-arm64-rock-5b-plus.img.xz` | Supported, 26.04 and 26.10 only |
+| Desktop | `ubuntu-<version>-preinstalled-desktop-arm64-rock-5b-plus.img.xz` | **Beta** |
+
+The **server diet** image is the server image without what a headless server does not need, like the DietPi or minimal Armbian images: no snapd and snaps, no fwupd and PackageKit, no multipath, iSCSI, LVM, RAID, btrfs or XFS tools, no ModemManager, apport or popularity-contest, a journal capped to 64 MB, and the boot waits 30 seconds at most for the network. Everything removed can be installed back with `apt`. See [`scripts/diet-image.sh`](scripts/diet-image.sh) for the full list.
+
+> [!WARNING]
+> The **desktop** images are **beta**: GNOME starts and runs, the GPU, Wi-Fi and Bluetooth work, but the desktop can freeze during heavy disk work such as `apt upgrade` from an SD card. No effort goes into them, the work is on the headless server images.
+
 ## Supported releases
 
 | Release | Kernel | U-Boot | Status |
