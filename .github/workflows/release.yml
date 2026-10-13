@@ -67,6 +67,8 @@ jobs:
           body: |
             Ubuntu images for the Radxa ROCK 5B+, see the README for the supported releases.
 
+            The focus is on the headless **server** images. The **server-diet** images leave out what a headless server does not need. The **desktop** images are **beta**: they work, but can freeze during heavy disk work, and get no further effort.
+
             Images larger than 2 GiB are split in parts because of the GitHub size limit. Join them before writing the image, the `.sha256` file is for the joined image:
 
             ```bash

@@ -117,7 +117,7 @@ overlay_dir=../overlay
 
 # Extract the compressed root filesystem
 rm -rf ${chroot_dir} && mkdir -p ${chroot_dir}
-tar -xpJf "ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz" -C ${chroot_dir}
+tar -xpJf "ubuntu-${RELASE_VERSION}-preinstalled-${ROOTFS_FLAVOR:-${FLAVOR}}-arm64.rootfs.tar.xz" -C ${chroot_dir}
 
 # Mount the root filesystem
 setup_mountpoint $chroot_dir
@@ -158,6 +158,11 @@ else
             chroot ${chroot_dir} apt-mark hold "$(dpkg-deb -f "${deb}" Package)"
         done
     fi
+fi
+
+# Remove what a headless server does not need
+if [[ ${DIET} == "y" ]]; then
+    ../scripts/diet-image.sh "${chroot_dir}"
 fi
 
 # Update the initramfs

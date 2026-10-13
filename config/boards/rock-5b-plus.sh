@@ -5,7 +5,7 @@ export BOARD_MAKER="Radxa"
 export BOARD_SOC="Rockchip RK3588"
 export BOARD_CPU="ARM Cortex A76 / A55"
 export COMPATIBLE_SUITES=("jammy" "noble" "resolute" "stonking")
-export COMPATIBLE_FLAVORS=("server" "desktop")
+export COMPATIBLE_FLAVORS=("server" "server-diet" "desktop")
 
 # Suites using the kernel from the Ubuntu archive boot with mainline U-Boot
 if [[ ${KERNEL_TYPE} == "mainline" ]]; then
