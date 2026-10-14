@@ -3,6 +3,8 @@
 # Install the running system to the eMMC or to an NVMe drive.
 #
 #   sudo ubuntu-rockchip-install [--yes] [--bootloader=auto|disk|spi|none] [emmc|nvme|/dev/DISK]
+#   sudo install-to-emmc [--yes]
+#   sudo install-to-nvme [--yes]
 #
 # The target disk is partitioned like the images, the running system is
 # copied to it with a new filesystem UUID, and U-Boot is written to it if it
@@ -349,6 +351,12 @@ auto_install() {
 
 main() {
     local target="" bootloader=auto assume_yes=n arg
+
+    # Also installed as install-to-emmc and install-to-nvme
+    case "$(basename "$0")" in
+        install-to-emmc) target=emmc ;;
+        install-to-nvme) target=nvme ;;
+    esac
 
     for arg in "$@"; do
         case "${arg}" in

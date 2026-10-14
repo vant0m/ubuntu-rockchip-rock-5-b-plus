@@ -32,6 +32,8 @@ purge=(
     multipath-tools open-iscsi lvm2 mdadm btrfs-progs xfsprogs
     # 4G/5G modems on the M.2 B key, install modemmanager back if needed
     modemmanager
+    # VMware guest tools
+    open-vm-tools
     # Crash reports, statistics and other phoning home
     apport apport-core-dump-handler whoopsie popularity-contest pollinate
     sosreport landscape-common motd-news-config byobu
@@ -98,6 +100,25 @@ cat > "${chroot_dir}/etc/systemd/system/systemd-networkd-wait-online.service.d/1
 ExecStart=
 ExecStart=/usr/lib/systemd/systemd-networkd-wait-online --any --timeout=30
 EOF
+
+# cloud-init only sets up the first boot, but took 20 seconds of every boot
+# on an SD card: disable it once that first boot is done. To run it again:
+#   sudo rm /etc/cloud/cloud-init.disabled && sudo cloud-init clean --reboot
+cat > "${chroot_dir}/etc/systemd/system/ubuntu-rockchip-disable-cloud-init.service" << EOF
+[Unit]
+Description=Disable cloud-init once the first boot setup is done
+After=cloud-final.service
+ConditionPathExists=/var/lib/cloud/instance/boot-finished
+ConditionPathExists=!/etc/cloud/cloud-init.disabled
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/touch /etc/cloud/cloud-init.disabled
+
+[Install]
+WantedBy=multi-user.target
+EOF
+chroot "${chroot_dir}" systemctl enable ubuntu-rockchip-disable-cloud-init
 
 for package in "${critical[@]}"; do
     if ! installed "${package}"; then

@@ -25,6 +25,8 @@ function config_image_hook__rock-5b-plus() {
     # boot when asked on the CIDATA partition. flashcp writes the SPI flash
     chroot "${rootfs}" apt-get -y install rsync mtd-utils
     install -m 755 "${overlay}/usr/sbin/ubuntu-rockchip-install" "${rootfs}/usr/sbin/ubuntu-rockchip-install"
+    ln -sf ubuntu-rockchip-install "${rootfs}/usr/sbin/install-to-emmc"
+    ln -sf ubuntu-rockchip-install "${rootfs}/usr/sbin/install-to-nvme"
     cp "${overlay}/usr/lib/systemd/system/ubuntu-rockchip-auto-install.service" "${rootfs}/usr/lib/systemd/system/"
     chroot "${rootfs}" systemctl enable ubuntu-rockchip-auto-install
 

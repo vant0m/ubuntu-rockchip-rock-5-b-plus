@@ -15,7 +15,7 @@ This project started as a fork of [Joshua-Riek/ubuntu-rockchip](https://github.c
 | Server diet | `ubuntu-<version>-preinstalled-server-diet-arm64-rock-5b-plus.img.xz` | Supported, 26.04 and 26.10 only |
 | Desktop | `ubuntu-<version>-preinstalled-desktop-arm64-rock-5b-plus.img.xz` | **Beta** |
 
-The **server diet** image is the server image without what a headless server does not need, like the DietPi or minimal Armbian images: no snapd and snaps, no fwupd and PackageKit, no multipath, iSCSI, LVM, RAID, btrfs or XFS tools, no ModemManager, apport or popularity-contest, a journal capped to 64 MB, and the boot waits 30 seconds at most for the network. Everything removed can be installed back with `apt`. See [`scripts/diet-image.sh`](scripts/diet-image.sh) for the full list.
+The **server diet** image is the server image without what a headless server does not need, like the DietPi or minimal Armbian images: no snapd and snaps, no fwupd and PackageKit, no multipath, iSCSI, LVM, RAID, btrfs or XFS tools, no ModemManager, apport or popularity-contest, a journal capped to 64 MB, the boot waits 30 seconds at most for the network, and cloud-init is disabled once it has set up the first boot (`sudo rm /etc/cloud/cloud-init.disabled && sudo cloud-init clean --reboot` runs it again). Everything removed can be installed back with `apt`. See [`scripts/diet-image.sh`](scripts/diet-image.sh) for the full list.
 
 > [!WARNING]
 > The **desktop** images are **beta**: GNOME starts and runs, the GPU, Wi-Fi and Bluetooth work, but the desktop can freeze during heavy disk work such as `apt upgrade` from an SD card. No effort goes into them, the work is on the headless server images.
@@ -76,8 +76,8 @@ For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
 The images run from the SD card, but the eMMC module or an NVMe drive is much faster. Once the system runs from the SD card, copy it with:
 
 ```bash
-sudo ubuntu-rockchip-install         # to the eMMC or the NVMe drive, when there is only one of them
-sudo ubuntu-rockchip-install emmc    # or nvme, or a disk like /dev/sda
+sudo install-to-emmc                 # or install-to-nvme
+sudo ubuntu-rockchip-install /dev/sda   # any other disk
 ```
 
 The disk is erased and partitioned like the image, and the running system is copied to it, with all its configuration. U-Boot is written to the eMMC, or to the SPI flash for an NVMe drive, as the RK3588 cannot load U-Boot from NVMe. Power off, remove the SD card, and the board boots from the new disk. U-Boot looks for a system on the SD card first, then the eMMC, then NVMe: the SD card stays usable as a rescue system.
