@@ -160,6 +160,12 @@ else
     fi
 fi
 
+# Boot the server images to multi-user.target, graphical.target only adds a
+# display manager, which they do not have
+if [[ ${FLAVOR} != "desktop" ]]; then
+    chroot ${chroot_dir} systemctl set-default multi-user.target
+fi
+
 # Remove what a headless server does not need
 if [[ ${DIET} == "y" ]]; then
     ../scripts/diet-image.sh "${chroot_dir}"
