@@ -117,7 +117,7 @@ overlay_dir=../overlay
 
 # Extract the compressed root filesystem
 rm -rf ${chroot_dir} && mkdir -p ${chroot_dir}
-tar -xpJf "ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz" -C ${chroot_dir}
+tar -xpJf "ubuntu-${RELASE_VERSION}-preinstalled-${ROOTFS_FLAVOR:-${FLAVOR}}-arm64.rootfs.tar.xz" -C ${chroot_dir}
 
 # Mount the root filesystem
 setup_mountpoint $chroot_dir
@@ -160,6 +160,17 @@ else
     fi
 fi
 
+# Boot the server images to multi-user.target, graphical.target only adds a
+# display manager, which they do not have
+if [[ ${FLAVOR} != "desktop" ]]; then
+    chroot ${chroot_dir} systemctl set-default multi-user.target
+fi
+
+# Remove what a headless server does not need
+if [[ ${DIET} == "y" ]]; then
+    ../scripts/diet-image.sh "${chroot_dir}"
+fi
+
 # Update the initramfs
 chroot ${chroot_dir} update-initramfs -u
 
@@ -167,6 +178,11 @@ chroot ${chroot_dir} update-initramfs -u
 chroot ${chroot_dir} apt-get -y clean
 chroot ${chroot_dir} apt-get -y autoclean
 chroot ${chroot_dir} apt-get -y autoremove
+
+# The board has no battery for its clock by default: systemd starts the
+# clock at least at the mtime of this file, the build time of the image,
+# instead of its own build time, which can be months earlier
+touch "${chroot_dir}/usr/lib/clock-epoch"
 
 # Umount the root filesystem
 teardown_mountpoint $chroot_dir

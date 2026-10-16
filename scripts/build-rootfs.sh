@@ -27,6 +27,13 @@ fi
 # shellcheck source=/dev/null
 source "../config/flavors/${FLAVOR}.sh"
 
+# Some flavors are made from the root filesystem of another one
+if [[ -n ${ROOTFS_FLAVOR} && ${ROOTFS_FLAVOR} != "${FLAVOR}" ]]; then
+    FLAVOR="${ROOTFS_FLAVOR}"
+    # shellcheck source=/dev/null
+    source "../config/flavors/${FLAVOR}.sh"
+fi
+
 if [[ -f ubuntu-${RELASE_VERSION}-preinstalled-${FLAVOR}-arm64.rootfs.tar.xz ]]; then
     exit 0
 fi

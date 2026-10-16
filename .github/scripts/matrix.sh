@@ -29,6 +29,7 @@ contains() {
 }
 
 images=""
+rootfs=""
 kernels=""
 for suite in "${COMPATIBLE_SUITES[@]}"; do
     contains "${wanted_suites}" "${suite}" || continue
@@ -55,7 +56,20 @@ for suite in "${COMPATIBLE_SUITES[@]}"; do
 
     for flavor in "${COMPATIBLE_FLAVORS[@]}"; do
         contains "${wanted_flavors}" "${flavor}" || continue
-        images+="{\"board\":\"${board}\",\"suite\":\"${suite}\",\"flavor\":\"${flavor}\",\"version\":\"${RELASE_VERSION}\",\"kernel_type\":\"${KERNEL_TYPE}\",\"runner\":\"${runner}\"},"
+
+        # Some flavors only exist for some kernels, and some are made from
+        # the root filesystem of another flavor
+        unset ROOTFS_FLAVOR FLAVOR_KERNEL_TYPES
+        # shellcheck source=/dev/null
+        source "config/flavors/${flavor}.sh"
+        if [ -n "${FLAVOR_KERNEL_TYPES}" ] && ! contains "${FLAVOR_KERNEL_TYPES}" "${KERNEL_TYPE}"; then
+            continue
+        fi
+        rootfs_flavor="${ROOTFS_FLAVOR:-${flavor}}"
+
+        images+="{\"board\":\"${board}\",\"suite\":\"${suite}\",\"flavor\":\"${flavor}\",\"rootfs_flavor\":\"${rootfs_flavor}\",\"version\":\"${RELASE_VERSION}\",\"kernel_type\":\"${KERNEL_TYPE}\",\"runner\":\"${runner}\"},"
+        entry="{\"suite\":\"${suite}\",\"flavor\":\"${rootfs_flavor}\",\"version\":\"${RELASE_VERSION}\",\"runner\":\"${runner}\"},"
+        [[ ${rootfs} == *"${entry}"* ]] || rootfs+="${entry}"
     done
 done
 
@@ -65,5 +79,6 @@ if [ -z "${images}" ]; then
 fi
 
 echo "images={\"include\":[${images%,}]}"
+echo "rootfs={\"include\":[${rootfs%,}]}"
 echo "kernels={\"include\":[${kernels%,}]}"
 echo "has_kernels=$([ -n "${kernels}" ] && echo true || echo false)"

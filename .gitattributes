@@ -1,0 +1,6 @@
+# Shell scripts and configuration files must keep Unix line endings, even
+# when checked out on Windows
+* text=auto eol=lf
+*.deb binary
+*.bin binary
+*.img binary
