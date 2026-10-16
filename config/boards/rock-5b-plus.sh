@@ -5,7 +5,7 @@ export BOARD_MAKER="Radxa"
 export BOARD_SOC="Rockchip RK3588"
 export BOARD_CPU="ARM Cortex A76 / A55"
 export COMPATIBLE_SUITES=("jammy" "noble" "resolute" "stonking")
-export COMPATIBLE_FLAVORS=("server" "desktop")
+export COMPATIBLE_FLAVORS=("server" "server-diet" "desktop")
 
 # Suites using the kernel from the Ubuntu archive boot with mainline U-Boot
 if [[ ${KERNEL_TYPE} == "mainline" ]]; then
@@ -20,6 +20,15 @@ function config_image_hook__rock-5b-plus() {
     local rootfs="$1"
     local overlay="$2"
     local suite="$3"
+
+    # Installer to the eMMC or an NVMe drive, run by hand or on the first
+    # boot when asked on the CIDATA partition. flashcp writes the SPI flash
+    chroot "${rootfs}" apt-get -y install rsync mtd-utils
+    install -m 755 "${overlay}/usr/sbin/ubuntu-rockchip-install" "${rootfs}/usr/sbin/ubuntu-rockchip-install"
+    ln -sf ubuntu-rockchip-install "${rootfs}/usr/sbin/install-to-emmc"
+    ln -sf ubuntu-rockchip-install "${rootfs}/usr/sbin/install-to-nvme"
+    cp "${overlay}/usr/lib/systemd/system/ubuntu-rockchip-auto-install.service" "${rootfs}/usr/lib/systemd/system/"
+    chroot "${rootfs}" systemctl enable ubuntu-rockchip-auto-install
 
     if [ "${suite}" == "jammy" ] || [ "${suite}" == "noble" ]; then
         # Install panfork
@@ -51,6 +60,23 @@ function config_image_hook__rock-5b-plus() {
         # kernel anyway so a failed detection cannot boot the ROCK 5B one
         mkdir -p "${rootfs}/etc/u-boot-menu/conf.d"
         echo 'U_BOOT_FDT="device-tree/rockchip/rk3588-rock-5b-plus.dtb"' > "${rootfs}/etc/u-boot-menu/conf.d/rock-5b-plus.conf"
+
+        # The device tree gives the blue status LED the heartbeat trigger,
+        # but the trigger is a module without alias that nothing loads: the
+        # LED would just turn off once Linux runs instead of blinking
+        mkdir -p "${rootfs}/etc/modules-load.d"
+        echo "ledtrig-heartbeat" > "${rootfs}/etc/modules-load.d/rock-5b-plus.conf"
+
+        # Tyr, the experimental Rust driver for the Mali GPU, matches the same
+        # device as Panthor. Whichever probes first gets the GPU, and Mesa
+        # only works with Panthor
+        mkdir -p "${rootfs}/etc/modprobe.d"
+        echo "blacklist tyr" > "${rootfs}/etc/modprobe.d/rock-5b-plus.conf"
+
+        # Keep the clock across reboots, the images use chrony and not
+        # systemd-timesyncd, which would do it
+        cp "${overlay}/usr/lib/systemd/system/ubuntu-rockchip-save-clock.service" "${rootfs}/usr/lib/systemd/system/"
+        chroot "${rootfs}" systemctl enable ubuntu-rockchip-save-clock
 
         # The Ubuntu generic kernel is an EFI application that the booti
         # command of U-Boot refuses. Wrap u-boot-update so the raw kernel

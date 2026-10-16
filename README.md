@@ -7,6 +7,19 @@ Ubuntu images for the [Radxa ROCK 5B+](https://radxa.com/products/rock5/5bp/) (R
 
 This project started as a fork of [Joshua-Riek/ubuntu-rockchip](https://github.com/Joshua-Riek/ubuntu-rockchip), which supported about thirty Rockchip boards and was archived in April 2026. Everything that did not concern the ROCK 5B+ has been removed, and Ubuntu 26.04 LTS and 26.10 images were added, built entirely from the official Ubuntu archive and mainline U-Boot. Other boards are not supported, use the original project or [Armbian](https://www.armbian.com/) for them.
 
+**The focus is a working headless server**, the 26.04 and 26.10 server images first. Three flavors are built:
+
+| Flavor | Image | Status |
+|---|---|---|
+| Server | `ubuntu-<version>-preinstalled-server-arm64-rock-5b-plus.img.xz` | Supported |
+| Server diet | `ubuntu-<version>-preinstalled-server-diet-arm64-rock-5b-plus.img.xz` | Supported, 26.04 and 26.10 only |
+| Desktop | `ubuntu-<version>-preinstalled-desktop-arm64-rock-5b-plus.img.xz` | **Beta** |
+
+The **server diet** image is the server image without what a headless server does not need, like the DietPi or minimal Armbian images: no snapd and snaps, no fwupd and PackageKit, no multipath, iSCSI, LVM, RAID, btrfs or XFS tools, no ModemManager, apport or popularity-contest, a journal capped to 64 MB, the boot waits 30 seconds at most for the network, and cloud-init is disabled once it has set up the first boot (`sudo rm /etc/cloud/cloud-init.disabled && sudo cloud-init clean --reboot` runs it again). Everything removed can be installed back with `apt`. See [`scripts/diet-image.sh`](scripts/diet-image.sh) for the full list.
+
+> [!WARNING]
+> The **desktop** images are **beta**: GNOME starts and runs, the GPU, Wi-Fi and Bluetooth work, but the desktop can freeze during heavy disk work such as `apt upgrade` from an SD card. No effort goes into them, the work is on the headless server images.
+
 ## Supported releases
 
 | Release | Kernel | U-Boot | Status |
@@ -37,7 +50,7 @@ The kernel has drivers for most of the board: GPU (Panthor), NPU (Rocket), video
 
 Make sure you use a good, reliable, and fast SD card. Most boot or stability troubles come from an insufficient power supply or the SD card (bad card, bad card reader, a failed write, or a card that is too slow).
 
-Download the image from the [releases](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/releases), or the artifacts of a [Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml) run. Images larger than 2 GiB (the desktop ones) are split in parts in the releases, join them first with `cat <image>.img.xz.part* > <image>.img.xz`. Then write the xz compressed image (no need to unpack it) to your SD card using [USBimager](https://bztsrc.gitlab.io/usbimager/) or [balenaEtcher](https://www.balena.io/etcher), which validate the written data.
+Download the image from the [releases](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/releases), or the artifacts of a [Build](https://github.com/vant0m/ubuntu-rockchip-rock-5-b-plus/actions/workflows/build.yml) run (the `ubuntu-<version>-preinstalled-<flavor>-arm64-rock-5b-plus` ones, the `rootfs-*` artifacts are intermediate files that cannot be flashed). Images larger than 2 GiB (the desktop ones) are split in parts in the releases, join them first with `cat <image>.img.xz.part* > <image>.img.xz`. Then write the xz compressed image (no need to unpack it) to your SD card using [USBimager](https://bztsrc.gitlab.io/usbimager/) or [balenaEtcher](https://www.balena.io/etcher), which validate the written data.
 
 The RK3588 boot ROM tries the SPI flash before the SD card. If the SPI flash of your board holds an old bootloader, it will be used instead of the one on the SD card. Once the system runs, you can update or install U-Boot with:
 
@@ -48,13 +61,54 @@ sudo u-boot-install-mtd            # the SPI flash
 
 ## Boot the system
 
-Insert your SD card into the slot on the board and power on the device. The first boot may take up to two minutes, so please be patient. A serial console is available on the debug UART at 1500000 baud.
+Insert your SD card into the slot on the board and power on the device. The first boot may take up to two minutes, so please be patient. On the 26.04 and 26.10 images, the green LED shows that the board is powered, and the blue status LED stays on while U-Boot runs, then blinks (heartbeat) once Linux has started. A serial console is available on the debug UART at 1500000 baud.
+
+Connect the network before the first boot if you can. Without a battery on the RTC connector, the board does not keep the time while it is off: the 26.04 and 26.10 images start the clock at the time of the last shutdown, or of the image build on the first boot, until NTP sets it once the network is up. At that moment, the periodic maintenance tasks (apt, fwupd, ...) that look overdue start at once, on top of the first boot work of cloud-init and snapd, and the system can be slow for a few minutes. This happens mostly on the first boot, and is much shorter on a fast SD card, the eMMC or an NVMe drive.
 
 ## Login information
 
 For Ubuntu Server you will be able to login through HDMI, a serial console connection, or SSH. The predefined user is `ubuntu` and the password is `ubuntu`, you will be asked to change it on the first login.
 
 For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
+
+## Install to the eMMC or an NVMe drive
+
+The images run from the SD card, but the eMMC module or an NVMe drive is much faster: the 26.04 server image boots in about 14 seconds from the eMMC, against about 40 seconds from an SD card. There are two ways to install, both erase the target disk.
+
+### Automatically, on the first boot (server images)
+
+1. Write the image to the SD card.
+2. On its small `CIDATA` partition, which any computer can open, create an empty file named `install-to-emmc`, or `install-to-nvme` (`install-to-emmc.txt` works too).
+3. Boot the board from the SD card. The image copies itself to that disk before its first boot setup, the blue LED blinking fast, then the board powers off.
+4. **Remove the SD card**, and power the board on: the first boot setup (password, SSH keys) runs on the new disk.
+
+The file on the SD card is renamed `install-to-emmc.done`, or `install-to-emmc.failed` with the blue LED left on and the system on the SD card booting as usual, next to `install-to-emmc.log`. Without one of these files, nothing happens, and the automatic installation only runs on the very first boot of an image.
+
+### By hand, from a running system
+
+Once the system runs from the SD card, copy it with all its configuration:
+
+```bash
+sudo install-to-emmc                     # to the eMMC
+sudo install-to-nvme                     # to the NVMe drive
+sudo ubuntu-rockchip-install /dev/sda    # to any other disk
+sudo ubuntu-rockchip-install --help      # the options
+```
+
+It asks you to type `yes` (`--yes` skips the question), and refuses the disk it runs from, a disk in use, or one too small for the data. Power off, remove the SD card, and power on.
+
+### How it boots
+
+The disk is partitioned like the image, with a new UUID for the root filesystem. U-Boot is written to the eMMC, or to the SPI flash for an NVMe drive, since the RK3588 boot ROM cannot load it from NVMe (`--bootloader=disk|spi|none` changes that). The boot ROM loads U-Boot from the SPI flash first, then the eMMC, then the SD card, and U-Boot boots the first system it finds on **the SD card**, then the eMMC, then NVMe: leave the SD card in to boot it as a rescue system, remove it to boot the installed one.
+
+## Reporting problems
+
+[`scripts/hw-report.sh`](scripts/hw-report.sh) collects what the system detected, the loaded drivers and the errors of the current boot. Run it on the board and attach its output to your issue:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/vant0m/ubuntu-rockchip-rock-5-b-plus/main/scripts/hw-report.sh
+sudo bash hw-report.sh > hw-report.txt
+```
 
 ## Building the images
 

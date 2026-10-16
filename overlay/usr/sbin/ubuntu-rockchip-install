@@ -1,0 +1,408 @@
+#!/bin/bash
+
+# Install the running system to the eMMC or to an NVMe drive.
+#
+#   sudo ubuntu-rockchip-install [--yes] [--bootloader=auto|disk|spi|none] [emmc|nvme|/dev/DISK]
+#   sudo install-to-emmc [--yes]
+#   sudo install-to-nvme [--yes]
+#
+# The target disk is partitioned like the images, the running system is
+# copied to it with a new filesystem UUID, and U-Boot is written to it if it
+# is the eMMC, or to the SPI flash otherwise: the boot ROM of the RK3588 can
+# only load U-Boot from the SPI flash, the eMMC or the SD card. U-Boot then
+# boots the first system it finds on the SD card, the eMMC, then NVMe.
+#
+# With --auto, run by ubuntu-rockchip-auto-install.service on the first boot
+# of an image, nothing happens unless a file named install-to-emmc or
+# install-to-nvme was created on the CIDATA partition of the SD card. The
+# image is then installed to that disk before its first boot runs, the blue
+# LED blinking fast, and the board powers off. The file is renamed with a
+# .done or .failed suffix, next to the log of the installation.
+
+set -Eeuo pipefail
+
+# Only changed by the tests: the root of the system to copy, and where to
+# write U-Boot in --auto mode
+source_root="${UBUNTU_ROCKCHIP_INSTALL_SOURCE:-/}"
+auto_bootloader="${UBUNTU_ROCKCHIP_INSTALL_BOOTLOADER:-auto}"
+
+log() {
+    echo "ubuntu-rockchip-install: $*"
+}
+
+die() {
+    echo "ubuntu-rockchip-install: error: $*" >&2
+    exit 1
+}
+
+usage() {
+    echo "Usage: $(basename "$0") [--yes] [--bootloader=auto|disk|spi|none] [emmc|nvme|/dev/DISK]"
+    echo
+    echo "Copy the running system to the eMMC, an NVMe drive or another disk."
+    echo "All the data on that disk is erased."
+    echo
+    echo "  --yes              do not ask for confirmation"
+    echo "  --bootloader=WHERE where to write U-Boot: the target disk, the SPI flash,"
+    echo "                     or nowhere. By default the disk if it is the eMMC,"
+    echo "                     else the SPI flash"
+}
+
+# Partition N of a disk: /dev/sda1, /dev/mmcblk0p1, /dev/nvme0n1p1
+partition() {
+    if [[ $1 =~ [0-9]$ ]]; then
+        echo "$1p$2"
+    else
+        echo "$1$2"
+    fi
+}
+
+# The disk holding a partition
+parent_disk() {
+    echo "/dev/$(lsblk -n -d -o PKNAME "$1")"
+}
+
+is_emmc() {
+    [ "$(cat "/sys/block/$(basename "$1")/device/type" 2> /dev/null)" = MMC ]
+}
+
+find_emmc() {
+    local dev
+    for dev in /sys/block/mmcblk*; do
+        [[ $(basename "${dev}") =~ ^mmcblk[0-9]+$ ]] || continue
+        if is_emmc "${dev}"; then
+            echo "/dev/$(basename "${dev}")"
+            return 0
+        fi
+    done
+    return 1
+}
+
+find_nvme() {
+    [ -b /dev/nvme0n1 ] && echo /dev/nvme0n1
+}
+
+# The partition labeled CIDATA on a disk, holding the cloud-init seed of
+# the server images
+find_cidata() {
+    local dev
+    for dev in $(lsblk -n -l -o PATH "$1"); do
+        if [ "$(blkid -p -s LABEL -o value "${dev}" 2> /dev/null)" = CIDATA ]; then
+            echo "${dev}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+spi_holds_data() {
+    [ -c /dev/mtd0 ] && [ "$(head -c 1048576 /dev/mtd0 2> /dev/null | tr -d '\377' 2> /dev/null | head -c 1 | wc -c)" -gt 0 ]
+}
+
+wait_block() {
+    for _ in $(seq 100); do
+        [ -b "$1" ] && return 0
+        sleep 0.1
+    done
+    die "$1 did not appear"
+}
+
+# Copy the system to a disk: install_system TARGET BOOTLOADER YES AUTO
+install_system() {
+    local target="$1" bootloader="$2" assume_yes="$3" auto="$4"
+    local uboot_dir="${source_root%/}/usr/lib/u-boot"
+    local source_part source_disk source_cidata="" source_uuid label
+    local target_root size used uuid answer status
+    local mkfs_options=() rsync_options=(-aAXHx --numeric-ids --exclude=/lost+found)
+
+    source_part="$(findmnt -n -o SOURCE -T "${source_root}")"
+    [ -b "${source_part}" ] || die "the system does not run from a disk partition (${source_part})"
+    source_disk="$(parent_disk "${source_part}")"
+    source_cidata="$(find_cidata "${source_disk}")" || true
+    source_uuid="$(blkid -p -s UUID -o value "${source_part}")"
+    label="$(blkid -p -s LABEL -o value "${source_part}")" || true
+
+    target="$(readlink -f "${target}")"
+    [ -b "${target}" ] || die "${target} is not a block device"
+    [ "${target}" != "${source_disk}" ] || die "the system runs from ${target}"
+    if lsblk -n -o MOUNTPOINTS "${target}" | grep -q .; then
+        die "${target} has mounted partitions or swap, unmount them first"
+    fi
+
+    used="$(df --output=used -B1 "${source_root}" | tail -n 1)"
+    size="$(blockdev --getsize64 "${target}")"
+    if (( used + 1024 * 1024 * 1024 > size )); then
+        die "${target} is too small: $((size / 1024 / 1024)) MiB for $((used / 1024 / 1024)) MiB of data"
+    fi
+
+    if [ "${bootloader}" = auto ]; then
+        if is_emmc "${target}"; then
+            bootloader=disk
+        else
+            bootloader=spi
+        fi
+    fi
+    if [ "${bootloader}" = spi ]; then
+        [ -c /dev/mtd0 ] || die "no SPI flash found to write U-Boot to, use --bootloader=none to skip it"
+        command -v flashcp > /dev/null || die "flashcp is needed to write the SPI flash, install mtd-utils"
+    fi
+
+    log "Source: ${source_part} on ${source_disk}"
+    log "Target: ${target}, $(lsblk -n -d -o SIZE,MODEL "${target}" | xargs)"
+    case "${bootloader}" in
+        disk) log "U-Boot: written to ${target}" ;;
+        spi) log "U-Boot: written to the SPI flash, replacing what it holds" ;;
+        none) log "U-Boot: not written" ;;
+    esac
+    if [ "${assume_yes}" != y ]; then
+        read -r -p "All the data on ${target} will be erased. Type yes to continue: " answer
+        [ "${answer}" = yes ] || die "cancelled"
+    fi
+
+    work="$(mktemp -d /run/ubuntu-rockchip-install.XXXXXX)"
+    mkdir "${work}/root" "${work}/cidata"
+    trap 'umount -q "${work}/cidata" "${work}/root" 2> /dev/null || true; rm -rf "${work}"' EXIT
+
+    # Partition the disk like the images: the first 16 MiB are left for
+    # U-Boot, the server images have a CIDATA partition for cloud-init
+    log "Partitioning ${target}"
+    dd if=/dev/zero of="${target}" bs=1M count=16 conv=fsync status=none
+    if [ -n "${source_cidata}" ]; then
+        sfdisk --quiet --wipe always --wipe-partitions always "${target}" <<EOF
+label: gpt
+start=16MiB, size=4MiB, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
+start=20MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+EOF
+        target_root="$(partition "${target}" 2)"
+    else
+        sfdisk --quiet --wipe always --wipe-partitions always "${target}" <<EOF
+label: gpt
+start=16MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+EOF
+        target_root="$(partition "${target}" 1)"
+    fi
+    # sfdisk makes the kernel read the new partitions, partx in case it could not
+    partx -u "${target}" 2> /dev/null || true
+    udevadm settle 2> /dev/null || true
+    wait_block "${target_root}"
+
+    if [ -n "${source_cidata}" ]; then
+        # Same cloud-init seed, so cloud-init sees the same instance and does
+        # not run its first boot again on an installed system
+        dd if="${source_cidata}" of="$(partition "${target}" 1)" bs=1M conv=fsync status=none
+        if mount "$(partition "${target}" 1)" "${work}/cidata"; then
+            rm -f "${work}/cidata"/install-to-*
+            umount "${work}/cidata"
+        else
+            log "Warning: could not remove the install-to-* files from the new CIDATA partition"
+        fi
+    fi
+
+    uuid="$(cat /proc/sys/kernel/random/uuid)"
+    mkfs_options=(-F -q -U "${uuid}")
+    [ -z "${label}" ] || mkfs_options+=(-L "${label}")
+    mkfs.ext4 "${mkfs_options[@]}" "${target_root}"
+    mount "${target_root}" "${work}/root"
+
+    log "Copying the system, this takes a few minutes"
+    if command -v rsync > /dev/null; then
+        if [ -t 1 ]; then
+            rsync_options+=(--info=progress2)
+        fi
+        status=0
+        rsync "${rsync_options[@]}" "${source_root%/}/" "${work}/root/" || status=$?
+        # 24: some files vanished during the copy, normal on a running system
+        [ "${status}" -eq 0 ] || [ "${status}" -eq 24 ] || die "rsync failed with status ${status}"
+    else
+        cp -ax "${source_root%/}/." "${work}/root/"
+    fi
+
+    # Mount the new root filesystem, and boot it, by its new UUID
+    sed -i "s/${source_uuid}/${uuid}/g" "${work}/root/etc/fstab" "${work}/root/boot/extlinux/extlinux.conf"
+    grep -q "^UUID=${uuid}\s\+/\s" "${work}/root/etc/fstab" || die "/etc/fstab does not mount / by UUID"
+    grep -q "root=UUID=${uuid}" "${work}/root/boot/extlinux/extlinux.conf" || die "extlinux.conf does not boot root=UUID"
+
+    if [ "${auto}" = y ]; then
+        # The image had not booted yet: let the installed system run its
+        # first boot, with its own machine ID
+        true > "${work}/root/etc/machine-id"
+    fi
+
+    umount "${work}/root"
+    sync
+
+    # Like u-boot-install and u-boot-install-mtd, without sudo, which can
+    # fail this early in the boot in --auto mode
+    case "${bootloader}" in
+        disk)
+            log "Writing U-Boot to ${target}"
+            if [ -f "${uboot_dir}/u-boot-rockchip.bin" ]; then
+                dd if="${uboot_dir}/u-boot-rockchip.bin" of="${target}" seek=1 bs=32k conv=fsync status=none
+            else
+                dd if="${uboot_dir}/idbloader.img" of="${target}" seek=64 conv=notrunc,fsync status=none
+                dd if="${uboot_dir}/u-boot.itb" of="${target}" seek=16384 conv=notrunc,fsync status=none
+            fi
+            if spi_holds_data; then
+                log "Warning: the SPI flash is not empty. The boot ROM loads U-Boot from it before the eMMC,"
+                log "if it holds an old bootloader, replace it with: sudo u-boot-install-mtd"
+            fi
+            ;;
+        spi)
+            log "Writing U-Boot to the SPI flash"
+            if [ -f "${uboot_dir}/u-boot-rockchip-spi.bin" ]; then
+                flashcp "${uboot_dir}/u-boot-rockchip-spi.bin" /dev/mtd0
+            else
+                flashcp "${uboot_dir}/rkspi_loader.img" /dev/mtd0
+            fi
+            ;;
+    esac
+
+    log "Done: power off, remove the SD card, and power on to boot from ${target}"
+}
+
+led_trigger() {
+    local led
+    for led in /sys/class/leds/*status*; do
+        [ -w "${led}/trigger" ] || continue
+        echo "$1" > "${led}/trigger" || return 0
+        if [ "$1" = timer ]; then
+            echo 100 > "${led}/delay_on" || true
+            echo 100 > "${led}/delay_off" || true
+        fi
+        return 0
+    done
+}
+
+# Install when a file on the CIDATA partition of the boot disk asks for it
+auto_install() {
+    local source_part source_disk cidata trigger="" target="" name status=0 outcome
+    local mnt="/run/ubuntu-rockchip-install-cidata" logfile="/run/ubuntu-rockchip-install.log"
+
+    mkdir -p /var/lib/ubuntu-rockchip
+    touch /var/lib/ubuntu-rockchip/auto-install.done
+
+    source_part="$(findmnt -n -o SOURCE -T /)"
+    source_disk="$(parent_disk "${source_part}")"
+    cidata="$(find_cidata "${source_disk}")" || return 0
+
+    mkdir -p "${mnt}"
+    mount -o ro "${cidata}" "${mnt}" || return 0
+    for name in install-to-emmc install-to-nvme; do
+        if [ -e "${mnt}/${name}" ] || [ -e "${mnt}/${name}.txt" ]; then
+            trigger="${name}"
+            break
+        fi
+    done
+    umount "${mnt}"
+    [ -n "${trigger}" ] || return 0
+
+    log "${trigger} found on ${cidata}"
+    modprobe -q ledtrig-timer || true
+    for _ in $(seq 20); do
+        compgen -G "/sys/class/leds/*status*" > /dev/null && break
+        sleep 0.5
+    done
+    led_trigger timer
+
+    # Wait for the disk, NVMe drives can take a few seconds to show up
+    for _ in $(seq 30); do
+        case "${trigger}" in
+            install-to-emmc) target="$(find_emmc)" || true ;;
+            install-to-nvme) target="$(find_nvme)" || true ;;
+        esac
+        [ -n "${target}" ] && break
+        sleep 1
+    done
+
+    if [ -z "${target}" ]; then
+        echo "ubuntu-rockchip-install: error: no disk found for ${trigger}" | tee "${logfile}"
+        status=1
+    else
+        # In a subshell, as errors exit
+        (install_system "${target}" "${auto_bootloader}" y y) 2>&1 | tee "${logfile}" || status=$?
+    fi
+
+    # Keep the log and the outcome next to the request
+    if [ "${status}" -eq 0 ]; then
+        outcome="done"
+    else
+        outcome="failed"
+    fi
+    if mount "${cidata}" "${mnt}"; then
+        cp "${logfile}" "${mnt}/${trigger}.log"
+        for name in "${trigger}" "${trigger}.txt"; do
+            if [ -e "${mnt}/${name}" ]; then
+                mv "${mnt}/${name}" "${mnt}/${trigger}.${outcome}"
+            fi
+        done
+        umount "${mnt}"
+    fi
+
+    if [ "${status}" -ne 0 ]; then
+        # Solid LED, and the system on the SD card boots as usual
+        led_trigger default-on
+        return 0
+    fi
+
+    led_trigger none
+    log "Powering off"
+    # D-Bus does not run yet, do not ask logind about inhibitors
+    systemctl poweroff --no-block --check-inhibitors=no
+}
+
+main() {
+    local target="" bootloader=auto assume_yes=n arg
+
+    # Also installed as install-to-emmc and install-to-nvme
+    case "$(basename "$0")" in
+        install-to-emmc) target=emmc ;;
+        install-to-nvme) target=nvme ;;
+    esac
+
+    for arg in "$@"; do
+        case "${arg}" in
+            --auto)
+                [ "$(id -u)" -eq 0 ] || die "please run as root"
+                auto_install
+                return 0
+                ;;
+            --yes) assume_yes=y ;;
+            --bootloader=auto | --bootloader=disk | --bootloader=spi | --bootloader=none)
+                bootloader="${arg#--bootloader=}"
+                ;;
+            -h | --help)
+                usage
+                return 0
+                ;;
+            -*)
+                usage >&2
+                return 1
+                ;;
+            *) target="${arg}" ;;
+        esac
+    done
+
+    [ "$(id -u)" -eq 0 ] || die "please run as root"
+
+    case "${target}" in
+        emmc) target="$(find_emmc)" || die "no eMMC found" ;;
+        nvme) target="$(find_nvme)" || die "no NVMe drive found" ;;
+        "")
+            # The only disk we can install to, if there is one
+            local emmc="" nvme="" root_disk
+            root_disk="$(parent_disk "$(findmnt -n -o SOURCE -T "${source_root}")")"
+            emmc="$(find_emmc)" || true
+            nvme="$(find_nvme)" || true
+            [ "${emmc}" != "${root_disk}" ] || emmc=""
+            [ "${nvme}" != "${root_disk}" ] || nvme=""
+            if [ -n "${emmc}" ] && [ -n "${nvme}" ]; then
+                die "found the eMMC ${emmc} and the NVMe drive ${nvme}, choose one: $(basename "$0") emmc|nvme"
+            fi
+            target="${emmc:-${nvme}}"
+            [ -n "${target}" ] || die "no eMMC or NVMe drive found to install to"
+            ;;
+    esac
+
+    install_system "${target}" "${bootloader}" "${assume_yes}" n
+}
+
+main "$@"

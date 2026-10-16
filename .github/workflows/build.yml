@@ -27,6 +27,7 @@ jobs:
     name: Create matrix
     outputs:
       images: ${{ steps.matrix.outputs.images }}
+      rootfs: ${{ steps.matrix.outputs.rootfs }}
       kernels: ${{ steps.matrix.outputs.kernels }}
       has_kernels: ${{ steps.matrix.outputs.has_kernels }}
     steps:
@@ -47,7 +48,7 @@ jobs:
     needs: [config]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.config.outputs.images) }}
+      matrix: ${{ fromJson(needs.config.outputs.rootfs) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -61,7 +62,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v7
         with:
-          name: ubuntu-${{ matrix.version }}-preinstalled-${{ matrix.flavor }}-arm64-rootfs
+          name: rootfs-ubuntu-${{ matrix.version }}-${{ matrix.flavor }}
           path: ./build/ubuntu-${{ matrix.version }}-preinstalled-${{ matrix.flavor }}-arm64.rootfs.tar.xz
           if-no-files-found: error
           compression-level: 0
@@ -114,7 +115,7 @@ jobs:
       - name: Download rootfs
         uses: actions/download-artifact@v8
         with:
-          name: ubuntu-${{ matrix.version }}-preinstalled-${{ matrix.flavor }}-arm64-rootfs
+          name: rootfs-ubuntu-${{ matrix.version }}-${{ matrix.rootfs_flavor }}
           path: ./build/
 
       - name: Download kernel
