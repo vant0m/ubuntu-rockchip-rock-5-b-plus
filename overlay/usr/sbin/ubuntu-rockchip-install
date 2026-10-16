@@ -95,7 +95,7 @@ find_cidata() {
 }
 
 spi_holds_data() {
-    [ -c /dev/mtd0 ] && [ "$(head -c 1048576 /dev/mtd0 | tr -d '\377' | head -c 1 | wc -c)" -gt 0 ]
+    [ -c /dev/mtd0 ] && [ "$(head -c 1048576 /dev/mtd0 2> /dev/null | tr -d '\377' 2> /dev/null | head -c 1 | wc -c)" -gt 0 ]
 }
 
 wait_block() {

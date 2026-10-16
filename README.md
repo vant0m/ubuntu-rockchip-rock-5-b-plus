@@ -73,16 +73,33 @@ For Ubuntu Desktop you must connect through HDMI and follow the setup wizard.
 
 ## Install to the eMMC or an NVMe drive
 
-The images run from the SD card, but the eMMC module or an NVMe drive is much faster. Once the system runs from the SD card, copy it with:
+The images run from the SD card, but the eMMC module or an NVMe drive is much faster: the 26.04 server image boots in about 14 seconds from the eMMC, against about 40 seconds from an SD card. There are two ways to install, both erase the target disk.
+
+### Automatically, on the first boot (server images)
+
+1. Write the image to the SD card.
+2. On its small `CIDATA` partition, which any computer can open, create an empty file named `install-to-emmc`, or `install-to-nvme` (`install-to-emmc.txt` works too).
+3. Boot the board from the SD card. The image copies itself to that disk before its first boot setup, the blue LED blinking fast, then the board powers off.
+4. **Remove the SD card**, and power the board on: the first boot setup (password, SSH keys) runs on the new disk.
+
+The file on the SD card is renamed `install-to-emmc.done`, or `install-to-emmc.failed` with the blue LED left on and the system on the SD card booting as usual, next to `install-to-emmc.log`. Without one of these files, nothing happens, and the automatic installation only runs on the very first boot of an image.
+
+### By hand, from a running system
+
+Once the system runs from the SD card, copy it with all its configuration:
 
 ```bash
-sudo install-to-emmc                 # or install-to-nvme
-sudo ubuntu-rockchip-install /dev/sda   # any other disk
+sudo install-to-emmc                     # to the eMMC
+sudo install-to-nvme                     # to the NVMe drive
+sudo ubuntu-rockchip-install /dev/sda    # to any other disk
+sudo ubuntu-rockchip-install --help      # the options
 ```
 
-The disk is erased and partitioned like the image, and the running system is copied to it, with all its configuration. U-Boot is written to the eMMC, or to the SPI flash for an NVMe drive, as the RK3588 cannot load U-Boot from NVMe. Power off, remove the SD card, and the board boots from the new disk. U-Boot looks for a system on the SD card first, then the eMMC, then NVMe: the SD card stays usable as a rescue system.
+It asks you to type `yes` (`--yes` skips the question), and refuses the disk it runs from, a disk in use, or one too small for the data. Power off, remove the SD card, and power on.
 
-The server image can also install itself without being used from the SD card first. After writing it to the SD card, create an empty file named `install-to-emmc`, or `install-to-nvme`, on its small `CIDATA` partition, which any computer can open. On its first boot, the image installs itself to that disk, the blue LED blinking fast, then the board powers off: remove the SD card and power it on again. The first boot setup (password, SSH keys) then runs on the new disk. The file is renamed with a `.done` suffix, or `.failed` with the blue LED left on, next to the log of the installation.
+### How it boots
+
+The disk is partitioned like the image, with a new UUID for the root filesystem. U-Boot is written to the eMMC, or to the SPI flash for an NVMe drive, since the RK3588 boot ROM cannot load it from NVMe (`--bootloader=disk|spi|none` changes that). The boot ROM loads U-Boot from the SPI flash first, then the eMMC, then the SD card, and U-Boot boots the first system it finds on **the SD card**, then the eMMC, then NVMe: leave the SD card in to boot it as a rescue system, remove it to boot the installed one.
 
 ## Reporting problems
 
