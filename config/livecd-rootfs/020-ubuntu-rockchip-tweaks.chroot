@@ -71,8 +71,16 @@ if [ "$SUBPROJECT" == "desktop-preinstalled" ]; then
     echo -n " quiet splash plymouth.ignore-serial-consoles" >> /etc/kernel/cmdline
 fi
 
-# flash-kernel does not know Rockchip boards and would fail kernel upgrades
+# flash-kernel does not know Rockchip boards and would fail kernel upgrades.
+# The Ubuntu kernels recommend "flash-kernel | grub-efi-arm64", so apt
+# installs one of them back with the next kernel: never install either,
+# U-Boot boots the kernel through extlinux
 apt-get -y purge flash-kernel
+cat > /etc/apt/preferences.d/ubuntu-rockchip-bootloader << EOF
+Package: flash-kernel grub-efi-arm64 grub-efi-arm64-bin grub-efi-arm64-signed
+Pin: release *
+Pin-Priority: -1
+EOF
 
 # Update extlinux
 u-boot-update
