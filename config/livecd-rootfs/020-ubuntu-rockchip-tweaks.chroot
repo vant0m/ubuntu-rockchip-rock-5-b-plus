@@ -74,10 +74,11 @@ fi
 # flash-kernel does not know Rockchip boards and would fail kernel upgrades.
 # The Ubuntu kernels recommend "flash-kernel | grub-efi-arm64", so apt
 # installs one of them back with the next kernel: never install either,
-# U-Boot boots the kernel through extlinux
+# U-Boot boots the kernel through extlinux. piboot-try, the Raspberry Pi
+# boot fallback helper that came with a later update, calls flash-kernel too
 apt-get -y purge flash-kernel
 cat > /etc/apt/preferences.d/ubuntu-rockchip-bootloader << EOF
-Package: flash-kernel grub-efi-arm64 grub-efi-arm64-bin grub-efi-arm64-signed
+Package: flash-kernel piboot-try grub-efi-arm64 grub-efi-arm64-bin grub-efi-arm64-signed
 Pin: release *
 Pin-Priority: -1
 EOF
