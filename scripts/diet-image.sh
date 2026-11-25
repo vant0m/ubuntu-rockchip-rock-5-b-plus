@@ -16,6 +16,14 @@ if [ ! -d "${chroot_dir}" ]; then
     exit 1
 fi
 
+# The kernel metapackage of the image, KERNEL_FLAVOR comes from the suite
+# config
+if [ -z "${KERNEL_FLAVOR}" ]; then
+    echo "Error: KERNEL_FLAVOR is not set"
+    exit 1
+fi
+kernel="linux-${KERNEL_FLAVOR}"
+
 # shellcheck disable=SC2016
 installed() {
     chroot "${chroot_dir}" dpkg-query -W -f '${db:Status-Status}\n' "$1" 2> /dev/null | grep -q '^installed$'
@@ -44,7 +52,7 @@ purge=(
 # manually installed
 keep=(
     openssh-server openssh-client cloud-init netplan.io sudo chrony
-    linux-generic u-boot-menu u-boot-rock-5b-plus rsync mtd-utils
+    "${kernel}" u-boot-menu u-boot-rock-5b-plus rsync mtd-utils
     ca-certificates curl wget gnupg unattended-upgrades wpasupplicant
     python3 dracut zstd vim-tiny vim nano less htop tmux screen ethtool
     iproute2 iputils-ping bash-completion command-not-found
@@ -54,7 +62,7 @@ keep=(
 # Must still be there at the end, or the image would not boot or not be
 # reachable
 critical=(
-    openssh-server cloud-init netplan.io sudo chrony linux-generic
+    openssh-server cloud-init netplan.io sudo chrony "${kernel}"
     u-boot-menu u-boot-rock-5b-plus systemd apt
 )
 
