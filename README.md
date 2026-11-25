@@ -375,8 +375,11 @@ SD card, and power on.
 
 ### 🐧 Kernel updates
 
-Kernels are updated with `apt` like on any Ubuntu machine. Follow the HWE kernel
-on an existing 26.04 installation with:
+Kernels are updated with `apt` like on any Ubuntu machine. On a v1.1.0 image,
+apply [this fix](#kernel-updates-on-v110) before any kernel update.
+
+The 26.04 images built after v1.1.0 follow the HWE kernel. To follow it on an
+existing installation:
 
 ```sh
 sudo apt install linux-generic-hwe-26.04
